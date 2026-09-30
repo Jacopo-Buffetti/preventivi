@@ -1,24 +1,33 @@
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { Platform } from 'react-native';
 import { DOCUMENTO } from '../constants/documento';
-import { htmlPreventivo, type DatiPdfPreventivo } from '../pdf/templatePreventivo';
+import {
+  htmlPreventivo,
+  type DatiPdfPreventivo,
+} from '../pdf/templatePreventivo';
+import { formattaData, formattaNumeroPreventivo } from '../utils/formato';
 import {
   getPreventivoById,
   getProfiloFabbro,
   getVociByPreventivoId,
 } from './databaseService';
-import { formattaData, formattaNumeroPreventivo } from '../utils/formato';
 
 // Formato A4 in punti tipografici (1 pt = 1/72 di pollice)
 const A4 = { width: 595, height: 842 };
 
 // Numero senza simbolo €, che nel template è già scritto prima del valore
 function importo(valore: number): string {
-  return valore.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return valore.toLocaleString('it-IT', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
 
-async function costruisciDati(idPreventivo: string): Promise<DatiPdfPreventivo> {
+async function costruisciDati(
+  idPreventivo: string
+): Promise<DatiPdfPreventivo> {
   const [preventivo, voci, profilo] = await Promise.all([
     getPreventivoById(idPreventivo),
     getVociByPreventivoId(idPreventivo),
@@ -28,7 +37,10 @@ async function costruisciDati(idPreventivo: string): Promise<DatiPdfPreventivo> 
   if (!preventivo) throw new Error(`Preventivo ${idPreventivo} non trovato`);
 
   return {
-    numero: formattaNumeroPreventivo(preventivo.anno, preventivo.numero_preventivo),
+    numero: formattaNumeroPreventivo(
+      preventivo.anno,
+      preventivo.numero_preventivo
+    ),
     data: formattaData(preventivo.data_creazione),
     oggetto: preventivo.oggetto ?? '',
     validitaGiorni: DOCUMENTO.validitaGiorni,
@@ -70,7 +82,9 @@ async function costruisciDati(idPreventivo: string): Promise<DatiPdfPreventivo> 
 
 // Genera il PDF del preventivo e apre la condivisione (WhatsApp, email, Drive...).
 // Sul web apre invece la finestra di stampa, da cui si può salvare come PDF.
-export async function condividiPdfPreventivo(idPreventivo: string): Promise<void> {
+export async function condividiPdfPreventivo(
+  idPreventivo: string
+): Promise<void> {
   const dati = await costruisciDati(idPreventivo);
   const html = htmlPreventivo(dati);
 
@@ -80,15 +94,93 @@ export async function condividiPdfPreventivo(idPreventivo: string): Promise<void
   }
 
   const { uri } = await Print.printToFileAsync({ html, ...A4 });
+  // Some Android devices restrict direct sharing from the temporary
+  // print location. Copying the file into the app cache directory
+  // ensures Sharing can read it reliably.
+  let uriToShare = uri;
+  try {
+    const filename = `preventivo-${idPreventivo}.pdf`;
+    const dest = FileSystem.cacheDirectory + filename;
+    // Copy the file to cache (overwrite if exists)
+    await FileSystem.copyAsync({ from: uri, to: dest });
+    uriToShare = dest;
+  } catch (copyErr) {
+    // If copy fails, try to obtain a content:// URI on Android so other apps can read it
+    console.warn(
+      'Impossibile copiare il PDF in cache, provo a ottenere content URI',
+      copyErr
+    );
+    try {
+      if (Platform.OS === 'android' && FileSystem.getContentUriAsync) {
+        const contentUri = await FileSystem.getContentUriAsync(uri);
+        uriToShare = contentUri;
+      } else {
+        uriToShare = uri;
+      }
+    } catch (contentErr) {
+      console.warn(
+        'Impossibile ottenere content URI, uso il percorso originale',
+        contentErr
+      );
+      uriToShare = uri;
+    }
+  }
 
   if (await Sharing.isAvailableAsync()) {
-    await Sharing.shareAsync(uri, {
-      mimeType: 'application/pdf',
-      UTI: 'com.adobe.pdf',
-      dialogTitle: `Preventivo ${dati.numero}`,
-    });
+    try {
+      await Sharing.shareAsync(uriToShare, {
+        mimeType: 'application/pdf',
+        UTI: 'com.adobe.pdf',
+        dialogTitle: `Preventivo ${dati.numero}`,
+      });
+    } catch (shareErr) {
+      console.error('Condivisione fallita', shareErr);
+      // Fallback: apri la UI di stampa se la condivisione fallisce
+      try {
+        await Print.printAsync({ uri: uriToShare });
+      } catch (printErr) {
+        console.error('Stampa di fallback fallita', printErr);
+        throw shareErr;
+      }
+    }
   } else {
-    await Print.printAsync({ uri });
+    await Print.printAsync({ uri: uriToShare });
+  }
+}
+
+// Genera il PDF e restituisce l'URI pronto per la condivisione/stampa.
+export async function generaPdfPreventivo(
+  idPreventivo: string
+): Promise<string> {
+  const dati = await costruisciDati(idPreventivo);
+  const html = htmlPreventivo(dati);
+
+  const { uri } = await Print.printToFileAsync({ html, ...A4 });
+
+  // Copia su cache per compatibilità con Sharing su Android
+  try {
+    const filename = `preventivo-${idPreventivo}.pdf`;
+    const dest = FileSystem.cacheDirectory + filename;
+    await FileSystem.copyAsync({ from: uri, to: dest });
+    return dest;
+  } catch (copyErr) {
+    // Try to return a content URI on Android if copy fails
+    console.warn(
+      'Impossibile copiare il PDF in cache, provo a ottenere content URI',
+      copyErr
+    );
+    try {
+      if (Platform.OS === 'android' && FileSystem.getContentUriAsync) {
+        const contentUri = await FileSystem.getContentUriAsync(uri);
+        return contentUri;
+      }
+    } catch (contentErr) {
+      console.warn(
+        'Impossibile ottenere content URI, uso il percorso originale',
+        contentErr
+      );
+    }
+    return uri;
   }
 }
 

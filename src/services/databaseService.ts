@@ -157,6 +157,29 @@ export async function addCliente(
   return id;
 }
 
+export async function updateCliente(
+  id: string,
+  cliente: Partial<Omit<Cliente, 'id'>>
+): Promise<void> {
+  const db = await getDbConnection();
+  await db.runAsync(
+    `UPDATE clienti SET nome = ?, telefono = ?, email = ?, indirizzo = ?, note = ? WHERE id = ?;`,
+    [
+      cliente.nome || '',
+      cliente.telefono || '',
+      cliente.email || '',
+      cliente.indirizzo || '',
+      cliente.note || '',
+      id,
+    ]
+  );
+}
+
+export async function deleteCliente(id: string): Promise<void> {
+  const db = await getDbConnection();
+  await db.runAsync('DELETE FROM clienti WHERE id = ?;', [id]);
+}
+
 // --- PREVENTIVI ---
 
 // Prossimo numero progressivo per l'anno indicato (1, 2, 3... ripartendo ogni anno)
@@ -292,7 +315,10 @@ export async function updateStatoPreventivo(
   stato: StatoPreventivo
 ): Promise<void> {
   const db = await getDbConnection();
-  await db.runAsync('UPDATE preventivi SET stato = ? WHERE id = ?;', [stato, id]);
+  await db.runAsync('UPDATE preventivi SET stato = ? WHERE id = ?;', [
+    stato,
+    id,
+  ]);
 }
 
 export async function deletePreventivo(id: string): Promise<void> {
@@ -300,7 +326,9 @@ export async function deletePreventivo(id: string): Promise<void> {
   // Le voci verrebbero cancellate anche dal vincolo ON DELETE CASCADE:
   // le eliminiamo esplicitamente per non dipendere da PRAGMA foreign_keys.
   await db.withTransactionAsync(async () => {
-    await db.runAsync('DELETE FROM voci_preventivo WHERE preventivo_id = ?;', [id]);
+    await db.runAsync('DELETE FROM voci_preventivo WHERE preventivo_id = ?;', [
+      id,
+    ]);
     await db.runAsync('DELETE FROM preventivi WHERE id = ?;', [id]);
   });
 }

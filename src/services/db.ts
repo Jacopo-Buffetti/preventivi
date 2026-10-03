@@ -96,6 +96,34 @@ async function apriEInizializza(): Promise<SQLite.SQLiteDatabase> {
     );
   `);
 
+  // 5. Biglietto da visita (una sola riga, id = 1)
+  await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS biglietto (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      logo TEXT,
+      descrizione_fronte TEXT,
+      nome TEXT,
+      qualifica TEXT,
+      descrizione_retro TEXT,
+      indirizzo TEXT,
+      telefono TEXT,
+      cellulare TEXT,
+      email TEXT,
+      email_secondaria TEXT,
+      p_iva TEXT,
+      codice_fiscale TEXT,
+      rea TEXT
+    );
+  `);
+
+  // Migrazione: aggiunge "qualifica" ai biglietti creati prima di questa colonna
+  const colonneBiglietto = await db.getAllAsync<{ name: string }>(
+    'PRAGMA table_info(biglietto);'
+  );
+  if (!colonneBiglietto.some((c) => c.name === 'qualifica')) {
+    await db.execAsync('ALTER TABLE biglietto ADD COLUMN qualifica TEXT;');
+  }
+
   console.log('Database aperto e tabelle pronte.');
   return db;
 }

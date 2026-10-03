@@ -330,6 +330,23 @@ export default function DettaglioPreventivoScreen() {
             ‹ Preventivi
           </Text>
         </Pressable>
+        <Pressable
+          onPress={() =>
+            router.push({
+              pathname: '/preventivi/nuovo',
+              params: { idPreventivo: preventivo.id },
+            })
+          }
+          style={({ pressed }) => [
+            styles.pillModifica,
+            { backgroundColor: t.card, borderColor: t.bordo },
+            pressed && { opacity: 0.85 },
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel="Modifica preventivo"
+        >
+          <Text style={[styles.pillModificaTesto, { color: t.accento }]}>✎  Modifica</Text>
+        </Pressable>
       </View>
 
       <ScrollView
@@ -465,40 +482,9 @@ export default function DettaglioPreventivoScreen() {
               )}
             </View>
           )}
-          {(!!preventivo.cliente_telefono || !!preventivo.cliente_email) && (
+          {/* Seconda riga: solo le azioni sul contatto */}
+          {!!preventivo.cliente_id && (
             <View style={styles.contatti}>
-              {!!preventivo.cliente_telefono && (
-                <Pressable
-                  onPress={() =>
-                    apri(
-                      `tel:${preventivo.cliente_telefono!.replace(/\s/g, '')}`
-                    )
-                  }
-                  style={[
-                    styles.contatto,
-                    { backgroundColor: t.bottoneSecondario },
-                  ]}
-                  accessibilityRole="link"
-                >
-                  <Text style={[styles.contattoTesto, { color: t.testo }]}>
-                    📞 Chiama
-                  </Text>
-                </Pressable>
-              )}
-              {!!preventivo.cliente_email && (
-                <Pressable
-                  onPress={() => apri(`mailto:${preventivo.cliente_email}`)}
-                  style={[
-                    styles.contatto,
-                    { backgroundColor: t.bottoneSecondario },
-                  ]}
-                  accessibilityRole="link"
-                >
-                  <Text style={[styles.contattoTesto, { color: t.testo }]}>
-                    ✉️ Email
-                  </Text>
-                </Pressable>
-              )}
               <Pressable
                 onPress={() =>
                   router.push({
@@ -761,6 +747,9 @@ const styles = StyleSheet.create({
   testoVuoto: { fontSize: 14, marginTop: 6 },
 
   barra: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingBottom: 8,
     width: '100%',
@@ -768,6 +757,13 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   indietro: { fontSize: 15, fontWeight: '600' },
+  pillModifica: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+  },
+  pillModificaTesto: { fontSize: 14, fontWeight: '700' },
 
   contenuto: {
     paddingHorizontal: 16,

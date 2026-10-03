@@ -25,10 +25,12 @@ interface Props {
   visibile: boolean;
   onChiudi: () => void;
   onAggiungi: (voce: NuovaVoce) => void;
+  // Se presente, il foglio serve a modificare questa voce invece di crearne una nuova
+  voceDaModificare?: NuovaVoce | null;
 }
 
 // Foglio che sale dal basso per inserire una voce di costo
-export function FoglioNuovaVoce({ visibile, onChiudi, onAggiungi }: Props) {
+export function FoglioNuovaVoce({ visibile, onChiudi, onAggiungi, voceDaModificare }: Props) {
   const t = useTema();
   const insets = useSafeAreaInsets();
 
@@ -37,15 +39,23 @@ export function FoglioNuovaVoce({ visibile, onChiudi, onAggiungi }: Props) {
   const [quantita, setQuantita] = useState('1');
   const [prezzo, setPrezzo] = useState('');
 
+  const inModifica = !!voceDaModificare;
+
   // Ogni volta che il foglio si apre, il form riparte vuoto
+  // oppure con i dati della voce da modificare
   useEffect(() => {
-    if (visibile) {
-      setListinoScelto(null);
+    if (!visibile) return;
+    setListinoScelto(null);
+    if (voceDaModificare) {
+      setDescrizione(voceDaModificare.descrizione);
+      setQuantita(String(voceDaModificare.quantita).replace('.', ','));
+      setPrezzo(String(voceDaModificare.prezzo_unitario).replace('.', ','));
+    } else {
       setDescrizione('');
       setQuantita('1');
       setPrezzo('');
     }
-  }, [visibile]);
+  }, [visibile, voceDaModificare]);
 
   const q = leggiNumero(quantita);
   const pu = leggiNumero(prezzo);
@@ -100,7 +110,9 @@ export function FoglioNuovaVoce({ visibile, onChiudi, onAggiungi }: Props) {
           <View style={[styles.maniglia, { backgroundColor: t.bordo }]} />
 
           <View style={styles.testa}>
-            <Text style={[styles.titolo, { color: t.accento }]}>Aggiungi Voce di Costo</Text>
+            <Text style={[styles.titolo, { color: t.accento }]}>
+              {inModifica ? 'Modifica Voce di Costo' : 'Aggiungi Voce di Costo'}
+            </Text>
             <Pressable onPress={onChiudi} hitSlop={12} accessibilityRole="button" accessibilityLabel="Chiudi">
               <Text style={[styles.chiudi, { color: t.testoSecondario }]}>✕</Text>
             </Pressable>
@@ -182,7 +194,9 @@ export function FoglioNuovaVoce({ visibile, onChiudi, onAggiungi }: Props) {
               ]}
               accessibilityRole="button"
             >
-              <Text style={styles.bottoneTesto}>＋ Aggiungi al Preventivo</Text>
+              <Text style={styles.bottoneTesto}>
+                {inModifica ? '✓ Salva voce' : '＋ Aggiungi al Preventivo'}
+              </Text>
             </Pressable>
           </ScrollView>
         </View>

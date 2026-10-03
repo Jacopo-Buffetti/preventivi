@@ -1,15 +1,20 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTema } from '../../constants/tema';
 import {
   getProfiloFabbro,
   updateProfiloFabbro,
 } from '../../services/databaseService';
 import { FormInput } from '../ui/FormInput';
 import { PrimaryButton } from '../ui/PrimaryButton';
+import { avviso } from '../../utils/dialoghi';
 
 export function ProfiloForm() {
   const router = useRouter();
+  const t = useTema();
+  const insets = useSafeAreaInsets();
 
   const [nomeAzienda, setNomeAzienda] = useState('');
   const [titolare, setTitolare] = useState('');
@@ -41,7 +46,7 @@ export function ProfiloForm() {
       }
     } catch (error) {
       console.error(error);
-      Alert.alert('Errore', 'Impossibile caricare i dati del profilo.');
+      avviso('Errore', 'Impossibile caricare i dati del profilo.');
     } finally {
       setCaricamento(false);
     }
@@ -49,7 +54,7 @@ export function ProfiloForm() {
 
   const handleSalva = async () => {
     if (!nomeAzienda.trim()) {
-      Alert.alert(
+      avviso(
         'Attenzione',
         "Inserisci il nome dell'azienda o della ditta."
       );
@@ -69,12 +74,11 @@ export function ProfiloForm() {
         iban,
       });
 
-      Alert.alert('Successo', 'Dati del profilo salvati correttamente!', [
-        { text: 'OK', onPress: () => router.back() },
-      ]);
+      avviso('Salvato', 'Dati del profilo salvati correttamente.');
+      if (router.canGoBack()) router.back();
     } catch (error) {
       console.error(error);
-      Alert.alert('Errore', 'Impossibile salvare i dati.');
+      avviso('Errore', 'Impossibile salvare i dati.');
     } finally {
       setSalvando(false);
     }
@@ -83,13 +87,17 @@ export function ProfiloForm() {
   if (caricamento) {
     return (
       <View style={styles.center}>
-        <Text style={styles.loadingText}>Caricamento dati...</Text>
+        <ActivityIndicator color={t.accento} size="large" />
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]}
+      keyboardShouldPersistTaps="handled"
+    >
       <FormInput
         label="Nome Azienda / Ditta *"
         placeholder="es. Officina Carpenteria Rossi"
@@ -175,15 +183,20 @@ export function ProfiloForm() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
-  content: { paddingBottom: 40 },
+  container: { flex: 1 },
+  content: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    width: '100%',
+    maxWidth: 720,
+    alignSelf: 'center',
+  },
   center: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: 40,
   },
-  loadingText: { color: '#64748b', fontSize: 15 },
   row: { flexDirection: 'row', gap: 12 },
   flex1: { flex: 1 },
   saveBtn: { marginBottom: 20 },

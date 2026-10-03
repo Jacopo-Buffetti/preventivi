@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -15,10 +15,14 @@ import { descriviCliente, SelettoreCliente } from '../../components/preventivi/S
 import { avviso } from '../../utils/dialoghi';
 import { useTema, type Tema } from '../../constants/tema';
 import {
+  getClienteById,
+  getPreventivoById,
   getProssimoNumeroPreventivo,
+  getVociByPreventivoId,
   savePreventivoWithVoci,
   type Cliente,
 } from '../../services/databaseService';
+import { updatePreventivoWithVoci } from '../../services/modificaPreventivoService';
 import { condividiPdfPreventivo } from '../../services/pdfService';
 import { formattaData, formattaEuro, formattaNumeroPreventivo } from '../../utils/formato';
 
@@ -30,32 +34,115 @@ interface VoceInLista extends NuovaVoce {
 
 export default function NuovoPreventivoScreen() {
   const router = useRouter();
+  // idCliente: arrivando dal dettaglio di un cliente, il cliente è già scelto
+  // idPreventivo: la pagina serve a modificare un preventivo esistente
+  const { idCliente, idPreventivo } = useLocalSearchParams<{
+    idCliente?: string;
+    idPreventivo?: string;
+  }>();
+  const inModifica = !!idPreventivo;
   const t = useTema();
   const insets = useSafeAreaInsets();
 
-  const oggi = new Date();
   const [numero, setNumero] = useState<number | null>(null);
+  const [anno, setAnno] = useState(new Date().getFullYear());
+  const [dataEmissione, setDataEmissione] = useState<string>(new Date().toISOString());
+  const [aliquotaIva, setAliquotaIva] = useState(ALIQUOTA_IVA);
+  const [note, setNote] = useState(''); // non modificabili qui, ma da conservare
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [oggetto, setOggetto] = useState('');
   const [voci, setVoci] = useState<VoceInLista[]>([]);
 
   const [selettoreAperto, setSelettoreAperto] = useState(false);
   const [foglioAperto, setFoglioAperto] = useState(false);
+  const [voceInModifica, setVoceInModifica] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const [caricamento, setCaricamento] = useState(inModifica);
 
-  // Numero provvisorio da mostrare: quello definitivo viene assegnato al salvataggio
+  // Nuovo preventivo: numero provvisorio da mostrare, quello definitivo viene
+  // assegnato al salvataggio
   useEffect(() => {
-    getProssimoNumeroPreventivo(oggi.getFullYear()).then(setNumero).catch(console.error);
-  }, []);
+    if (inModifica) return;
+    getProssimoNumeroPreventivo(new Date().getFullYear()).then(setNumero).catch(console.error);
+  }, [inModifica]);
+
+  // Modifica: carica il preventivo esistente con le sue voci e il cliente
+  useEffect(() => {
+    if (!idPreventivo) return;
+    (async () => {
+      try {
+        const [p, vociSalvate] = await Promise.all([
+          getPreventivoById(idPreventivo),
+          getVociByPreventivoId(idPreventivo),
+        ]);
+        if (!p) {
+          avviso('Errore', 'Preventivo non trovato.');
+          router.back();
+          return;
+        }
+        setNumero(p.numero_preventivo);
+        setAnno(p.anno);
+        setDataEmissione(p.data_creazione);
+        setAliquotaIva(p.aliquota_iva);
+        setNote(p.note_pagamento ?? '');
+        setOggetto(p.oggetto ?? '');
+        setVoci(
+          vociSalvate.map((v) => ({
+            chiave: v.id,
+            descrizione: v.descrizione,
+            quantita: v.quantita,
+            prezzo_unitario: v.prezzo_unitario,
+          }))
+        );
+        if (p.cliente_id) setCliente(await getClienteById(p.cliente_id));
+      } catch (err) {
+        console.error(err);
+        avviso('Errore', 'Impossibile caricare il preventivo.');
+      } finally {
+        setCaricamento(false);
+      }
+    })();
+  }, [idPreventivo]);
+
+  useEffect(() => {
+    if (!idCliente) return;
+    getClienteById(idCliente)
+      .then((c) => c && setCliente(c))
+      .catch(console.error);
+  }, [idCliente]);
 
   const imponibile = voci.reduce((somma, v) => somma + v.quantita * v.prezzo_unitario, 0);
-  const iva = (imponibile * ALIQUOTA_IVA) / 100;
+  const iva = (imponibile * aliquotaIva) / 100;
   const totale = imponibile + iva;
 
-  const aggiungiVoce = (voce: NuovaVoce) => {
-    setVoci((attuali) => [...attuali, { ...voce, chiave: `${Date.now()}-${attuali.length}` }]);
-    setFoglioAperto(false);
+  // Il foglio serve sia ad aggiungere una voce sia a modificarne una esistente
+  const confermaVoce = (voce: NuovaVoce) => {
+    if (voceInModifica) {
+      setVoci((attuali) =>
+        attuali.map((v) => (v.chiave === voceInModifica ? { ...voce, chiave: v.chiave } : v))
+      );
+    } else {
+      setVoci((attuali) => [...attuali, { ...voce, chiave: `${Date.now()}-${attuali.length}` }]);
+    }
+    chiudiFoglio();
   };
+
+  const apriNuovaVoce = () => {
+    setVoceInModifica(null);
+    setFoglioAperto(true);
+  };
+
+  const apriModificaVoce = (chiave: string) => {
+    setVoceInModifica(chiave);
+    setFoglioAperto(true);
+  };
+
+  const chiudiFoglio = () => {
+    setFoglioAperto(false);
+    setVoceInModifica(null);
+  };
+
+  const voceDaModificare = voci.find((v) => v.chiave === voceInModifica) ?? null;
 
   const rimuoviVoce = (chiave: string) =>
     setVoci((attuali) => attuali.filter((v) => v.chiave !== chiave));
@@ -70,18 +157,36 @@ export default function NuovoPreventivoScreen() {
       return;
     }
 
+    const dati = {
+      cliente_id: cliente.id,
+      oggetto: oggetto.trim(),
+      aliquota_iva: aliquotaIva,
+      note_pagamento: note,
+      voci: voci.map(({ descrizione, quantita, prezzo_unitario }) => ({
+        descrizione,
+        quantita,
+        prezzo_unitario,
+      })),
+    };
+
+    // Modifica: salva e torna al dettaglio, che si ricarica da solo
+    if (idPreventivo) {
+      try {
+        setSalvando(true);
+        await updatePreventivoWithVoci(idPreventivo, dati);
+        router.back();
+      } catch (err) {
+        console.error(err);
+        avviso('Errore', 'Impossibile salvare le modifiche.');
+      } finally {
+        setSalvando(false);
+      }
+      return;
+    }
+
     try {
       setSalvando(true);
-      const id = await savePreventivoWithVoci({
-        cliente_id: cliente.id,
-        oggetto: oggetto.trim(),
-        aliquota_iva: ALIQUOTA_IVA,
-        voci: voci.map(({ descrizione, quantita, prezzo_unitario }) => ({
-          descrizione,
-          quantita,
-          prezzo_unitario,
-        })),
-      });
+      const id = await savePreventivoWithVoci(dati);
 
       // Il preventivo è salvato: un errore nel PDF non deve farlo sembrare perso
       try {
@@ -106,6 +211,14 @@ export default function NuovoPreventivoScreen() {
 
   const stileCampo = [styles.campo, { backgroundColor: t.input, borderColor: t.bordo }];
 
+  if (caricamento) {
+    return (
+      <View style={[styles.container, styles.centro, { backgroundColor: t.sfondo }]}>
+        <ActivityIndicator color={t.accento} size="large" />
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: t.sfondo }]}>
       {/* Barra superiore */}
@@ -113,7 +226,9 @@ export default function NuovoPreventivoScreen() {
         <Pressable onPress={() => router.back()} hitSlop={12} accessibilityRole="button">
           <Text style={[styles.annulla, { color: t.testoSecondario }]}>Annulla</Text>
         </Pressable>
-        <Text style={[styles.titoloBarra, { color: t.testo }]}>Nuovo Preventivo</Text>
+        <Text style={[styles.titoloBarra, { color: t.testo }]}>
+          {inModifica ? 'Modifica Preventivo' : 'Nuovo Preventivo'}
+        </Text>
         <View style={styles.segnapostoBarra} />
       </View>
 
@@ -140,13 +255,13 @@ export default function NuovoPreventivoScreen() {
         <Etichetta testo="N° PREVENTIVO" t={t} />
         <View style={stileCampo}>
           <Text style={[styles.campoTesto, { color: t.testo }]}>
-            {numero !== null ? formattaNumeroPreventivo(oggi.getFullYear(), numero) : '…'}
+            {numero !== null ? formattaNumeroPreventivo(anno, numero) : '…'}
           </Text>
         </View>
 
         <Etichetta testo="DATA" t={t} />
         <View style={stileCampo}>
-          <Text style={[styles.campoTesto, { color: t.testo }]}>{formattaData(oggi)}</Text>
+          <Text style={[styles.campoTesto, { color: t.testo }]}>{formattaData(dataEmissione)}</Text>
         </View>
 
         <Etichetta testo="OGGETTO DEL LAVORO" t={t} />
@@ -163,7 +278,7 @@ export default function NuovoPreventivoScreen() {
           <Text style={[styles.etichetta, styles.senzaMargine, { color: t.testoSecondario }]}>
             VOCI DI COSTO ({voci.length})
           </Text>
-          <Pressable onPress={() => setFoglioAperto(true)} hitSlop={8} accessibilityRole="button">
+          <Pressable onPress={apriNuovaVoce} hitSlop={8} accessibilityRole="button">
             <Text style={[styles.linkAggiungi, { color: t.accento }]}>+ AGGIUNGI VOCE</Text>
           </Pressable>
         </View>
@@ -175,14 +290,24 @@ export default function NuovoPreventivoScreen() {
           >
             <View style={styles.voceTesta}>
               <Text style={[styles.voceDescrizione, { color: t.testo }]}>{v.descrizione}</Text>
-              <Pressable
-                onPress={() => rimuoviVoce(v.chiave)}
-                hitSlop={10}
-                accessibilityRole="button"
-                accessibilityLabel={`Elimina ${v.descrizione}`}
-              >
-                <Text style={styles.cestino}>🗑️</Text>
-              </Pressable>
+              <View style={styles.voceAzioni}>
+                <Pressable
+                  onPress={() => apriModificaVoce(v.chiave)}
+                  hitSlop={10}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Modifica ${v.descrizione}`}
+                >
+                  <Text style={styles.cestino}>✏️</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => rimuoviVoce(v.chiave)}
+                  hitSlop={10}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Elimina ${v.descrizione}`}
+                >
+                  <Text style={styles.cestino}>🗑️</Text>
+                </Pressable>
+              </View>
             </View>
             <View style={styles.voceDettagli}>
               <Text style={[styles.voceMeta, { color: t.testoSecondario }]}>
@@ -199,7 +324,7 @@ export default function NuovoPreventivoScreen() {
         ))}
 
         <Pressable
-          onPress={() => setFoglioAperto(true)}
+          onPress={apriNuovaVoce}
           style={({ pressed }) => [
             styles.aggiungiTratteggiato,
             { borderColor: t.accento, backgroundColor: t.card },
@@ -213,7 +338,7 @@ export default function NuovoPreventivoScreen() {
         {/* Riepilogo */}
         <View style={[styles.riepilogo, { backgroundColor: t.card, borderTopColor: t.accento }]}>
           <RigaTotale etichetta="Imponibile:" valore={formattaEuro(imponibile)} t={t} />
-          <RigaTotale etichetta={`IVA (${ALIQUOTA_IVA}%):`} valore={formattaEuro(iva)} t={t} />
+          <RigaTotale etichetta={`IVA (${aliquotaIva}%):`} valore={formattaEuro(iva)} t={t} />
           <View style={[styles.separatore, { backgroundColor: t.bordo }]} />
           <View style={styles.rigaTotale}>
             <Text style={[styles.totaleEtichetta, { color: t.testo }]}>TOTALE:</Text>
@@ -235,7 +360,9 @@ export default function NuovoPreventivoScreen() {
           {salvando ? (
             <ActivityIndicator color="#FFFFFF" />
           ) : (
-            <Text style={styles.salvaTesto}>💾 Salva e Genera PDF</Text>
+            <Text style={styles.salvaTesto}>
+              {inModifica ? '💾 Salva modifiche' : '💾 Salva e Genera PDF'}
+            </Text>
           )}
         </Pressable>
       </ScrollView>
@@ -250,8 +377,9 @@ export default function NuovoPreventivoScreen() {
       />
       <FoglioNuovaVoce
         visibile={foglioAperto}
-        onChiudi={() => setFoglioAperto(false)}
-        onAggiungi={aggiungiVoce}
+        onChiudi={chiudiFoglio}
+        onAggiungi={confermaVoce}
+        voceDaModificare={voceDaModificare}
       />
     </View>
   );
@@ -272,6 +400,7 @@ function RigaTotale({ etichetta, valore, t }: { etichetta: string; valore: strin
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  centro: { alignItems: 'center', justifyContent: 'center' },
 
   barra: {
     flexDirection: 'row',
@@ -328,6 +457,7 @@ const styles = StyleSheet.create({
   },
   voceDescrizione: { flex: 1, fontSize: 14, fontWeight: '700' },
   cestino: { fontSize: 16 },
+  voceAzioni: { flexDirection: 'row', gap: 14 },
   voceDettagli: {
     flexDirection: 'row',
     justifyContent: 'space-between',

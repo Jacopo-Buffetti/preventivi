@@ -1,42 +1,47 @@
-import { Pressable, PressableProps, StyleSheet, Text } from 'react-native';
+import { ActivityIndicator, Pressable, PressableProps, StyleSheet, Text } from 'react-native';
+import { useTema } from '../../constants/tema';
 
 interface PrimaryButtonProps extends PressableProps {
   title: string;
   loading?: boolean;
 }
 
-export function PrimaryButton({
-  title,
-  loading,
-  disabled,
-  style,
-  ...props
-}: PrimaryButtonProps) {
+export function PrimaryButton({ title, loading, disabled, style, ...props }: PrimaryButtonProps) {
+  const t = useTema();
   const isDisabled = disabled || loading;
 
   return (
     <Pressable
-      style={[
+      style={({ pressed }) => [
         styles.button,
+        { backgroundColor: t.bottonePrimario },
         isDisabled && styles.disabled,
-        typeof style === 'function' ? style({ pressed: false }) : style,
+        pressed && styles.pressed,
+        typeof style === 'function'
+          ? (style as (stato: { pressed: boolean }) => any)({ pressed })
+          : style,
       ]}
       disabled={isDisabled}
+      accessibilityRole="button"
       {...props}
     >
-      <Text style={styles.text}>{loading ? 'Salvataggio...' : title}</Text>
+      {loading ? (
+        <ActivityIndicator color="#FFFFFF" />
+      ) : (
+        <Text style={styles.text}>{title}</Text>
+      )}
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   button: {
-    backgroundColor: '#2563eb',
-    padding: 16,
-    borderRadius: 10,
+    paddingVertical: 16,
+    borderRadius: 12,
     alignItems: 'center',
     marginTop: 10,
   },
-  disabled: { backgroundColor: '#93c5fd' },
-  text: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  disabled: { opacity: 0.6 },
+  pressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },
+  text: { color: '#fff', fontSize: 15, fontWeight: '800' },
 });

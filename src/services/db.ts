@@ -76,12 +76,7 @@ async function apriEInizializza(): Promise<SQLite.SQLiteDatabase> {
 
   // Migrazione: aggiunge "oggetto" ai database creati prima di questa colonna.
   // CREATE TABLE IF NOT EXISTS non modifica una tabella già esistente.
-  const colonnePreventivi = await db.getAllAsync<{ name: string }>(
-    'PRAGMA table_info(preventivi);'
-  );
-  if (!colonnePreventivi.some((c) => c.name === 'oggetto')) {
-    await db.execAsync('ALTER TABLE preventivi ADD COLUMN oggetto TEXT;');
-  }
+  await aggiungiColonnaSeManca(db, 'preventivi', 'oggetto', 'TEXT');
 
   // 4. Tabella Voci Preventivo
   await db.execAsync(`
@@ -117,13 +112,97 @@ async function apriEInizializza(): Promise<SQLite.SQLiteDatabase> {
   `);
 
   // Migrazione: aggiunge "qualifica" ai biglietti creati prima di questa colonna
-  const colonneBiglietto = await db.getAllAsync<{ name: string }>(
-    'PRAGMA table_info(biglietto);'
-  );
-  if (!colonneBiglietto.some((c) => c.name === 'qualifica')) {
-    await db.execAsync('ALTER TABLE biglietto ADD COLUMN qualifica TEXT;');
-  }
+  await aggiungiColonnaSeManca(db, 'biglietto', 'qualifica', 'TEXT');
+
+  // Migrazione per la sincronizzazione (vedi commento sotto)
+  await aggiungiColonneSincronizzazione(db);
 
   console.log('Database aperto e tabelle pronte.');
   return db;
+}
+
+// --- MIGRAZIONI ---
+
+// Aggiunge una colonna solo se la tabella non ce l'ha già.
+// Serve perché SQLite non ha "ADD COLUMN IF NOT EXISTS": senza il controllo,
+// al secondo avvio l'ALTER TABLE fallirebbe con "duplicate column name".
+async function aggiungiColonnaSeManca(
+  db: SQLite.SQLiteDatabase,
+  tabella: string,
+  colonna: string,
+  definizione: string
+): Promise<boolean> {
+  const colonne = await db.getAllAsync<{ name: string }>(
+    `PRAGMA table_info(${tabella});`
+  );
+  if (colonne.some((c) => c.name === colonna)) return false;
+
+  await db.execAsync(
+    `ALTER TABLE ${tabella} ADD COLUMN ${colonna} ${definizione};`
+  );
+  return true;
+}
+
+// Data e ora attuali nello stesso formato di new Date().toISOString(),
+// es. 2026-10-07T09:15:30.123Z, così confronti e ordinamenti sono coerenti.
+const ADESSO_SQL = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
+
+// Colonne che servono alla sincronizzazione con Supabase:
+//
+// - updated_at       quando la riga è stata modificata l'ultima volta.
+//                    Serve a decidere chi vince se la stessa riga è stata
+//                    modificata su due dispositivi ("vince l'ultima modifica").
+// - da_sincronizzare 1 = modificata qui e non ancora mandata al server.
+//                    Il push legge solo le righe con 1 e, a invio riuscito,
+//                    le rimette a 0.
+// - deleted_at       quando la riga è stata cancellata (cancellazione "soft").
+//                    Se cancellassimo davvero la riga, l'altro dispositivo non
+//                    saprebbe mai che deve toglierla anche lui.
+//
+// Quali tabelle hanno cosa:
+// - clienti e preventivi: tutte e tre.
+// - profilo_fabbro e biglietto: solo updated_at e da_sincronizzare, perché
+//   sono righe uniche che si modificano ma non si cancellano.
+// - voci_preventivo: nessuna. Le voci viaggiano sempre insieme al loro
+//   preventivo: quando cambia una voce si marca il preventivo, e il push
+//   manda il preventivo con tutte le sue voci.
+//
+// Le righe già esistenti ricevono updated_at = adesso e da_sincronizzare = 1:
+// al primo collegamento con Supabase verranno quindi caricate tutte.
+async function aggiungiColonneSincronizzazione(db: SQLite.SQLiteDatabase) {
+  const tabelle = [
+    { nome: 'clienti', cancellabile: true },
+    { nome: 'preventivi', cancellabile: true },
+    { nome: 'profilo_fabbro', cancellabile: false },
+    { nome: 'biglietto', cancellabile: false },
+  ];
+
+  for (const { nome, cancellabile } of tabelle) {
+    // SQLite non accetta un default "dinamico" (come l'ora attuale) in
+    // ALTER TABLE: aggiungiamo la colonna vuota e la riempiamo subito dopo.
+    const aggiunta = await aggiungiColonnaSeManca(
+      db,
+      nome,
+      'updated_at',
+      'TEXT'
+    );
+    if (aggiunta) {
+      await db.execAsync(
+        `UPDATE ${nome} SET updated_at = ${ADESSO_SQL} WHERE updated_at IS NULL;`
+      );
+    }
+
+    // Default 1: anche le righe esistenti risultano "da sincronizzare"
+    await aggiungiColonnaSeManca(
+      db,
+      nome,
+      'da_sincronizzare',
+      'INTEGER NOT NULL DEFAULT 1'
+    );
+
+    if (cancellabile) {
+      // NULL = riga attiva; una data = riga cancellata
+      await aggiungiColonnaSeManca(db, nome, 'deleted_at', 'TEXT');
+    }
+  }
 }

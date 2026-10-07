@@ -1,4 +1,10 @@
-import { ActivityIndicator, Pressable, PressableProps, StyleSheet, Text } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  PressableProps,
+  StyleSheet,
+  Text,
+} from 'react-native';
 import { useTema } from '../../constants/tema';
 
 interface PrimaryButtonProps extends PressableProps {
@@ -6,7 +12,13 @@ interface PrimaryButtonProps extends PressableProps {
   loading?: boolean;
 }
 
-export function PrimaryButton({ title, loading, disabled, style, ...props }: PrimaryButtonProps) {
+export function PrimaryButton({
+  title,
+  loading,
+  disabled,
+  style,
+  ...props
+}: PrimaryButtonProps) {
   const t = useTema();
   const isDisabled = disabled || loading;
 

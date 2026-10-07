@@ -18,7 +18,8 @@ export async function condividiContatto(b: Biglietto): Promise<void> {
     return;
   }
 
-  if (!FileSystem.cacheDirectory) throw new Error('Cartella cache non disponibile');
+  if (!FileSystem.cacheDirectory)
+    throw new Error('Cartella cache non disponibile');
   const uri = FileSystem.cacheDirectory + nomeFile;
   await FileSystem.writeAsStringAsync(uri, contenuto, {
     encoding: FileSystem.EncodingType.UTF8,
@@ -37,7 +38,8 @@ export async function condividiContatto(b: Biglietto): Promise<void> {
       dialogTitle: 'Condividi contatto',
     });
   } catch (err) {
-    if (String(err).includes('Another share request')) throw new Error(CONDIVISIONE_IN_CORSO);
+    if (String(err).includes('Another share request'))
+      throw new Error(CONDIVISIONE_IN_CORSO);
     throw err;
   } finally {
     condivisioneAperta = false;

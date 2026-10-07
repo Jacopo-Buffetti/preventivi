@@ -21,8 +21,12 @@ export default function RootLayout() {
   if (erroreDb) {
     return (
       <View style={[styles.centro, { backgroundColor: t.sfondo }]}>
-        <Text style={[styles.titolo, { color: t.testo }]}>Impossibile aprire il database</Text>
-        <Text style={[styles.dettaglio, { color: t.testoSecondario }]}>{erroreDb}</Text>
+        <Text style={[styles.titolo, { color: t.testo }]}>
+          Impossibile aprire il database
+        </Text>
+        <Text style={[styles.dettaglio, { color: t.testoSecondario }]}>
+          {erroreDb}
+        </Text>
       </View>
     );
   }
@@ -84,7 +88,9 @@ export default function RootLayout() {
 
 // Le emoji non si possono colorare: la scheda inattiva viene resa più trasparente
 function IconaTab({ emoji, attiva }: { emoji: string; attiva: boolean }) {
-  return <Text style={[styles.icona, { opacity: attiva ? 1 : 0.45 }]}>{emoji}</Text>;
+  return (
+    <Text style={[styles.icona, { opacity: attiva ? 1 : 0.45 }]}>{emoji}</Text>
+  );
 }
 
 const styles = StyleSheet.create({

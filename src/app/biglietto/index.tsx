@@ -13,7 +13,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AnteprimaBiglietto } from '../../components/biglietto/AnteprimaBiglietto';
 import { FormInput } from '../../components/ui/FormInput';
 import { useTema, type Tema } from '../../constants/tema';
-import { CONDIVISIONE_IN_CORSO, condividiPdfBiglietto } from '../../services/bigliettoPdf';
+import {
+  CONDIVISIONE_IN_CORSO,
+  condividiPdfBiglietto,
+} from '../../services/bigliettoPdf';
 import {
   campiMancanti,
   getBiglietto,
@@ -132,7 +135,10 @@ export default function BigliettoScreen() {
   const esporta = async () => {
     const mancanti = campiMancanti(dati);
     if (mancanti.length > 0) {
-      avviso('Mancano dei dati', `Per creare il biglietto compila: ${mancanti.join(', ')}.`);
+      avviso(
+        'Mancano dei dati',
+        `Per creare il biglietto compila: ${mancanti.join(', ')}.`
+      );
       return;
     }
     if (modificato && !(await salva())) return;
@@ -150,7 +156,10 @@ export default function BigliettoScreen() {
   const inviaContatto = async () => {
     const mancanti = campiMancanti(dati);
     if (mancanti.length > 0) {
-      avviso('Mancano dei dati', `Per creare il contatto compila: ${mancanti.join(', ')}.`);
+      avviso(
+        'Mancano dei dati',
+        `Per creare il contatto compila: ${mancanti.join(', ')}.`
+      );
       return;
     }
     if (modificato && !(await salva())) return;
@@ -176,22 +185,35 @@ export default function BigliettoScreen() {
   return (
     <ScrollView
       style={{ backgroundColor: t.sfondo }}
-      contentContainerStyle={[styles.contenuto, { paddingTop: insets.top + 24 }]}
+      contentContainerStyle={[
+        styles.contenuto,
+        { paddingTop: insets.top + 24 },
+      ]}
       keyboardShouldPersistTaps="handled"
       automaticallyAdjustKeyboardInsets
     >
-      <Text style={[styles.titolo, { color: t.testo }]}>Biglietto da visita</Text>
+      <Text style={[styles.titolo, { color: t.testo }]}>
+        Biglietto da visita
+      </Text>
       <Text style={[styles.sottotitolo, { color: t.testoSecondario }]}>
         Componi il tuo biglietto: l'anteprima si aggiorna mentre scrivi.
       </Text>
 
       {/* Anteprima con scelta del lato */}
-      <View style={[styles.selettore, { backgroundColor: t.card, borderColor: t.bordo }]}>
+      <View
+        style={[
+          styles.selettore,
+          { backgroundColor: t.card, borderColor: t.bordo },
+        ]}
+      >
         {(['fronte', 'retro'] as const).map((l) => (
           <Pressable
             key={l}
             onPress={() => setLato(l)}
-            style={[styles.selettoreVoce, lato === l && { backgroundColor: t.bottonePrimario }]}
+            style={[
+              styles.selettoreVoce,
+              lato === l && { backgroundColor: t.bottonePrimario },
+            ]}
             accessibilityRole="button"
             accessibilityState={{ selected: lato === l }}
           >
@@ -212,7 +234,11 @@ export default function BigliettoScreen() {
         style={styles.anteprima}
         accessibilityLabel="Gira il biglietto"
       >
-        <AnteprimaBiglietto dati={dati} lato={lato} larghezza={larghezzaAnteprima} />
+        <AnteprimaBiglietto
+          dati={dati}
+          lato={lato}
+          larghezza={larghezzaAnteprima}
+        />
         <Text style={[styles.suggerimento, { color: t.testoSecondario }]}>
           Tocca il biglietto per girarlo
         </Text>
@@ -220,10 +246,12 @@ export default function BigliettoScreen() {
 
       {/* Logo */}
       <Sezione titolo="LOGO" t={t} />
-      <View style={[styles.card, { backgroundColor: t.card, borderColor: t.bordo }]}>
+      <View
+        style={[styles.card, { backgroundColor: t.card, borderColor: t.bordo }]}
+      >
         <Text style={[styles.testoCard, { color: t.testoSecondario }]}>
-          Il logo compare grande sul fronte e piccolo sul retro. Funziona meglio con un'immagine
-          quadrata su sfondo bianco o trasparente.
+          Il logo compare grande sul fronte e piccolo sul retro. Funziona meglio
+          con un'immagine quadrata su sfondo bianco o trasparente.
         </Text>
         <View style={styles.rigaBottoni}>
           <Pressable
@@ -250,7 +278,9 @@ export default function BigliettoScreen() {
               ]}
               accessibilityRole="button"
             >
-              <Text style={[styles.bottoneLogoTesto, { color: t.pericolo }]}>Rimuovi</Text>
+              <Text style={[styles.bottoneLogoTesto, { color: t.pericolo }]}>
+                Rimuovi
+              </Text>
             </Pressable>
           )}
         </View>
@@ -269,8 +299,14 @@ export default function BigliettoScreen() {
       {/* Retro */}
       <View style={styles.intestazioneRetro}>
         <Sezione titolo="RETRO" t={t} />
-        <Pressable onPress={copiaDalProfilo} hitSlop={8} accessibilityRole="button">
-          <Text style={[styles.link, { color: t.accento }]}>Completa dal profilo</Text>
+        <Pressable
+          onPress={copiaDalProfilo}
+          hitSlop={8}
+          accessibilityRole="button"
+        >
+          <Text style={[styles.link, { color: t.accento }]}>
+            Completa dal profilo
+          </Text>
         </Pressable>
       </View>
 
@@ -288,7 +324,8 @@ export default function BigliettoScreen() {
         onChangeText={aggiorna('qualifica')}
       />
       <Text style={[styles.notaCampo, { color: t.testoSecondario }]}>
-        La qualifica non compare sul biglietto: viene inserita solo nel contatto condiviso.
+        La qualifica non compare sul biglietto: viene inserita solo nel contatto
+        condiviso.
       </Text>
       <FormInput
         label="Descrizione retro"
@@ -378,7 +415,9 @@ export default function BigliettoScreen() {
         onFocus={() => setLato('retro')}
       />
 
-      <Text style={[styles.nota, { color: t.testoSecondario }]}>* campi obbligatori</Text>
+      <Text style={[styles.nota, { color: t.testoSecondario }]}>
+        * campi obbligatori
+      </Text>
 
       {/* Azioni */}
       <Pressable
@@ -395,7 +434,9 @@ export default function BigliettoScreen() {
         {esportando ? (
           <ActivityIndicator color="#FFFFFF" />
         ) : (
-          <Text style={styles.bottonePrimarioTesto}>📄 Condividi PDF per la stampa</Text>
+          <Text style={styles.bottonePrimarioTesto}>
+            📄 Condividi PDF per la stampa
+          </Text>
         )}
       </Pressable>
 
@@ -431,7 +472,11 @@ export default function BigliettoScreen() {
         accessibilityRole="button"
       >
         <Text style={[styles.bottoneSecondarioTesto, { color: t.testo }]}>
-          {salvando ? 'Salvataggio…' : modificato ? '💾 Salva modifiche' : '✓ Salvato'}
+          {salvando
+            ? 'Salvataggio…'
+            : modificato
+              ? '💾 Salva modifiche'
+              : '✓ Salvato'}
         </Text>
       </Pressable>
     </ScrollView>
@@ -469,7 +514,9 @@ async function datiDalProfilo(attuali: Biglietto): Promise<Biglietto> {
 }
 
 function Sezione({ titolo, t }: { titolo: string; t: Tema }) {
-  return <Text style={[styles.sezione, { color: t.testoSecondario }]}>{titolo}</Text>;
+  return (
+    <Text style={[styles.sezione, { color: t.testoSecondario }]}>{titolo}</Text>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -492,7 +539,11 @@ const styles = StyleSheet.create({
     marginTop: 20,
     alignSelf: 'center',
   },
-  selettoreVoce: { paddingHorizontal: 22, paddingVertical: 8, borderRadius: 999 },
+  selettoreVoce: {
+    paddingHorizontal: 22,
+    paddingVertical: 8,
+    borderRadius: 999,
+  },
   selettoreTesto: { fontSize: 14, fontWeight: '700' },
 
   anteprima: { alignItems: 'center', marginTop: 16 },
@@ -515,7 +566,12 @@ const styles = StyleSheet.create({
   card: { borderWidth: 1, borderRadius: 12, padding: 14 },
   testoCard: { fontSize: 13, lineHeight: 19 },
   rigaBottoni: { flexDirection: 'row', gap: 8, marginTop: 12 },
-  bottoneLogo: { flex: 1, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
+  bottoneLogo: {
+    flex: 1,
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
   bottoneRimuovi: { flex: 0, paddingHorizontal: 18, borderWidth: 1 },
   bottoneLogoTesto: { fontSize: 14, fontWeight: '700' },
 
@@ -524,7 +580,12 @@ const styles = StyleSheet.create({
   nota: { fontSize: 12, marginTop: -4 },
   notaCampo: { fontSize: 12, marginTop: -10, marginBottom: 16 },
 
-  bottonePrimario: { borderRadius: 12, paddingVertical: 16, alignItems: 'center', marginTop: 20 },
+  bottonePrimario: {
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginTop: 20,
+  },
   bottonePrimarioTesto: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
   bottoneContatto: {
     borderWidth: 1,

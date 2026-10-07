@@ -17,7 +17,11 @@ const COLORI = {
   oroChiaro: '#F59E0B',
 };
 
-const MONOSPACE = Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' });
+const MONOSPACE = Platform.select({
+  ios: 'Menlo',
+  android: 'monospace',
+  default: 'monospace',
+});
 
 interface Props {
   dati: Biglietto;
@@ -46,16 +50,30 @@ export function AnteprimaBiglietto({ dati, lato, larghezza }: Props) {
       {/* Barra decorativa superiore: tre tonalità al posto del gradiente */}
       <View style={[styles.barra, { height: px(4) }]}>
         <View style={[styles.barraParte, { backgroundColor: COLORI.oro }]} />
-        <View style={[styles.barraParte, { backgroundColor: COLORI.oroChiaro }]} />
+        <View
+          style={[styles.barraParte, { backgroundColor: COLORI.oroChiaro }]}
+        />
         <View style={[styles.barraParte, { backgroundColor: COLORI.oro }]} />
       </View>
 
-      {lato === 'fronte' ? <Fronte dati={dati} px={px} /> : <Retro dati={dati} px={px} />}
+      {lato === 'fronte' ? (
+        <Fronte dati={dati} px={px} />
+      ) : (
+        <Retro dati={dati} px={px} />
+      )}
     </View>
   );
 }
 
-function Logo({ uri, dimensione, px }: { uri?: string; dimensione: number; px: (v: number) => number }) {
+function Logo({
+  uri,
+  dimensione,
+  px,
+}: {
+  uri?: string;
+  dimensione: number;
+  px: (v: number) => number;
+}) {
   if (uri) {
     return (
       <Image
@@ -73,7 +91,12 @@ function Logo({ uri, dimensione, px }: { uri?: string; dimensione: number; px: (
         { width: px(dimensione), height: px(dimensione), borderRadius: px(8) },
       ]}
     >
-      <Text style={[styles.logoVuotoTesto, { fontSize: px(dimensione > 60 ? 11 : 7) }]}>
+      <Text
+        style={[
+          styles.logoVuotoTesto,
+          { fontSize: px(dimensione > 60 ? 11 : 7) },
+        ]}
+      >
         LOGO
       </Text>
     </View>
@@ -130,7 +153,10 @@ function Retro({ dati, px }: { dati: Biglietto; px: (v: number) => number }) {
             {(dati.nome || 'Nome attività').toUpperCase()}
           </Text>
           {!!dati.descrizione_retro && (
-            <Text style={[styles.titolo, { fontSize: px(9) }]} numberOfLines={1}>
+            <Text
+              style={[styles.titolo, { fontSize: px(9) }]}
+              numberOfLines={1}
+            >
               {dati.descrizione_retro.toUpperCase()}
             </Text>
           )}
@@ -141,8 +167,15 @@ function Retro({ dati, px }: { dati: Biglietto; px: (v: number) => number }) {
       <View style={[styles.dettagli, { gap: px(5) }]}>
         {dettagli.map((d, i) => (
           <View key={i} style={[styles.dettaglio, { gap: px(6) }]}>
-            <Text style={{ fontSize: px(10), width: px(14), textAlign: 'center' }}>{d.icona}</Text>
-            <Text style={[styles.dettaglioTesto, { fontSize: px(10.5) }]} numberOfLines={1}>
+            <Text
+              style={{ fontSize: px(10), width: px(14), textAlign: 'center' }}
+            >
+              {d.icona}
+            </Text>
+            <Text
+              style={[styles.dettaglioTesto, { fontSize: px(10.5) }]}
+              numberOfLines={1}
+            >
               {d.valore}
             </Text>
           </View>
@@ -151,7 +184,11 @@ function Retro({ dati, px }: { dati: Biglietto; px: (v: number) => number }) {
 
       <View style={[styles.legale, { paddingTop: px(6) }]}>
         {legali.map((l) => (
-          <Text key={l} style={[styles.legaleTesto, { fontSize: px(8) }]} numberOfLines={1}>
+          <Text
+            key={l}
+            style={[styles.legaleTesto, { fontSize: px(8) }]}
+            numberOfLines={1}
+          >
             {l}
           </Text>
         ))}
@@ -168,7 +205,13 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     boxShadow: '0px 10px 25px -5px rgba(0, 0, 0, 0.25)',
   },
-  barra: { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row' },
+  barra: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+  },
   barraParte: { flex: 1 },
   flex: { flex: 1 },
 
@@ -179,7 +222,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  logoVuotoTesto: { color: COLORI.testoLegale, fontWeight: '700', letterSpacing: 1 },
+  logoVuotoTesto: {
+    color: COLORI.testoLegale,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
 
   fronte: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   sottotitoloFronte: {
@@ -212,5 +259,9 @@ const styles = StyleSheet.create({
     borderTopColor: '#F1F5F9',
     gap: 6,
   },
-  legaleTesto: { color: COLORI.testoLegale, fontFamily: MONOSPACE, fontWeight: '600' },
+  legaleTesto: {
+    color: COLORI.testoLegale,
+    fontFamily: MONOSPACE,
+    fontWeight: '600',
+  },
 });

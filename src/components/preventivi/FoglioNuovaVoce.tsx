@@ -30,7 +30,12 @@ interface Props {
 }
 
 // Foglio che sale dal basso per inserire una voce di costo
-export function FoglioNuovaVoce({ visibile, onChiudi, onAggiungi, voceDaModificare }: Props) {
+export function FoglioNuovaVoce({
+  visibile,
+  onChiudi,
+  onAggiungi,
+  voceDaModificare,
+}: Props) {
   const t = useTema();
   const insets = useSafeAreaInsets();
 
@@ -60,7 +65,8 @@ export function FoglioNuovaVoce({ visibile, onChiudi, onAggiungi, voceDaModifica
   const q = leggiNumero(quantita);
   const pu = leggiNumero(prezzo);
   const subtotale = q !== null && pu !== null ? q * pu : 0;
-  const valida = descrizione.trim() !== '' && q !== null && q > 0 && pu !== null && pu >= 0;
+  const valida =
+    descrizione.trim() !== '' && q !== null && q > 0 && pu !== null && pu >= 0;
 
   const scegliDaListino = (indice: number | null) => {
     setListinoScelto(indice);
@@ -76,7 +82,11 @@ export function FoglioNuovaVoce({ visibile, onChiudi, onAggiungi, voceDaModifica
 
   const conferma = () => {
     if (!valida) return;
-    onAggiungi({ descrizione: descrizione.trim(), quantita: q!, prezzo_unitario: pu! });
+    onAggiungi({
+      descrizione: descrizione.trim(),
+      quantita: q!,
+      prezzo_unitario: pu!,
+    });
   };
 
   const stileInput = [
@@ -85,7 +95,12 @@ export function FoglioNuovaVoce({ visibile, onChiudi, onAggiungi, voceDaModifica
   ];
 
   return (
-    <Modal visible={visibile} transparent animationType="slide" onRequestClose={onChiudi}>
+    <Modal
+      visible={visibile}
+      transparent
+      animationType="slide"
+      onRequestClose={onChiudi}
+    >
       <KeyboardAvoidingView
         style={styles.contenitore}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -113,8 +128,15 @@ export function FoglioNuovaVoce({ visibile, onChiudi, onAggiungi, voceDaModifica
             <Text style={[styles.titolo, { color: t.accento }]}>
               {inModifica ? 'Modifica Voce di Costo' : 'Aggiungi Voce di Costo'}
             </Text>
-            <Pressable onPress={onChiudi} hitSlop={12} accessibilityRole="button" accessibilityLabel="Chiudi">
-              <Text style={[styles.chiudi, { color: t.testoSecondario }]}>✕</Text>
+            <Pressable
+              onPress={onChiudi}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel="Chiudi"
+            >
+              <Text style={[styles.chiudi, { color: t.testoSecondario }]}>
+                ✕
+              </Text>
             </Pressable>
           </View>
 
@@ -155,7 +177,9 @@ export function FoglioNuovaVoce({ visibile, onChiudi, onAggiungi, voceDaModifica
               returnKeyType="next"
             />
 
-            <Text style={[styles.etichetta, { color: t.testoSecondario }]}>Q.TÀ</Text>
+            <Text style={[styles.etichetta, { color: t.testoSecondario }]}>
+              Q.TÀ
+            </Text>
             <TextInput
               value={quantita}
               onChangeText={setQuantita}
@@ -177,7 +201,9 @@ export function FoglioNuovaVoce({ visibile, onChiudi, onAggiungi, voceDaModifica
             />
 
             <View style={styles.subtotale}>
-              <Text style={[styles.subtotaleEtichetta, { color: t.testo }]}>Subtotale Riga:</Text>
+              <Text style={[styles.subtotaleEtichetta, { color: t.testo }]}>
+                Subtotale Riga:
+              </Text>
               <Text style={[styles.subtotaleValore, { color: t.accento }]}>
                 {formattaEuro(subtotale)}
               </Text>
@@ -205,7 +231,15 @@ export function FoglioNuovaVoce({ visibile, onChiudi, onAggiungi, voceDaModifica
   );
 }
 
-function Chip({ testo, attivo, onPress }: { testo: string; attivo: boolean; onPress: () => void }) {
+function Chip({
+  testo,
+  attivo,
+  onPress,
+}: {
+  testo: string;
+  attivo: boolean;
+  onPress: () => void;
+}) {
   const t = useTema();
   return (
     <Pressable
@@ -220,7 +254,9 @@ function Chip({ testo, attivo, onPress }: { testo: string; attivo: boolean; onPr
       accessibilityRole="button"
       accessibilityState={{ selected: attivo }}
     >
-      <Text style={[styles.chipTesto, { color: attivo ? '#FFFFFF' : t.testo }]}>{testo}</Text>
+      <Text style={[styles.chipTesto, { color: attivo ? '#FFFFFF' : t.testo }]}>
+        {testo}
+      </Text>
     </Pressable>
   );
 }

@@ -1,6 +1,14 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  FlatList,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTema } from '../../constants/tema';
 import { getClienti, type Cliente } from '../../services/databaseService';
@@ -31,7 +39,9 @@ export function SelettoreCliente({ visibile, onChiudi, onScegli }: Props) {
   }, [visibile]);
 
   const q = ricerca.trim().toLowerCase();
-  const filtrati = q ? clienti.filter((c) => c.nome.toLowerCase().includes(q)) : clienti;
+  const filtrati = q
+    ? clienti.filter((c) => c.nome.toLowerCase().includes(q))
+    : clienti;
 
   const nuovoCliente = () => {
     onChiudi();
@@ -39,7 +49,12 @@ export function SelettoreCliente({ visibile, onChiudi, onScegli }: Props) {
   };
 
   return (
-    <Modal visible={visibile} transparent animationType="slide" onRequestClose={onChiudi}>
+    <Modal
+      visible={visibile}
+      transparent
+      animationType="slide"
+      onRequestClose={onChiudi}
+    >
       <View style={styles.contenitore}>
         <Pressable
           style={[StyleSheet.absoluteFill, { backgroundColor: t.overlay }]}
@@ -49,14 +64,27 @@ export function SelettoreCliente({ visibile, onChiudi, onScegli }: Props) {
         <View
           style={[
             styles.foglio,
-            { backgroundColor: t.card, borderColor: t.accento, paddingBottom: insets.bottom + 16 },
+            {
+              backgroundColor: t.card,
+              borderColor: t.accento,
+              paddingBottom: insets.bottom + 16,
+            },
           ]}
         >
           <View style={[styles.maniglia, { backgroundColor: t.bordo }]} />
           <View style={styles.testa}>
-            <Text style={[styles.titolo, { color: t.accento }]}>Scegli il cliente</Text>
-            <Pressable onPress={onChiudi} hitSlop={12} accessibilityRole="button" accessibilityLabel="Chiudi">
-              <Text style={[styles.chiudi, { color: t.testoSecondario }]}>✕</Text>
+            <Text style={[styles.titolo, { color: t.accento }]}>
+              Scegli il cliente
+            </Text>
+            <Pressable
+              onPress={onChiudi}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel="Chiudi"
+            >
+              <Text style={[styles.chiudi, { color: t.testoSecondario }]}>
+                ✕
+              </Text>
             </Pressable>
           </View>
 
@@ -67,7 +95,11 @@ export function SelettoreCliente({ visibile, onChiudi, onScegli }: Props) {
             placeholderTextColor={t.testoSecondario}
             style={[
               styles.input,
-              { backgroundColor: t.inputFoglio, borderColor: t.bordo, color: t.testo },
+              {
+                backgroundColor: t.inputFoglio,
+                borderColor: t.bordo,
+                color: t.testo,
+              },
             ]}
             autoCorrect={false}
           />
@@ -94,9 +126,13 @@ export function SelettoreCliente({ visibile, onChiudi, onScegli }: Props) {
                 ]}
                 accessibilityRole="button"
               >
-                <Text style={[styles.nome, { color: t.testo }]}>{item.nome}</Text>
+                <Text style={[styles.nome, { color: t.testo }]}>
+                  {item.nome}
+                </Text>
                 {!!item.indirizzo && (
-                  <Text style={[styles.dettaglio, { color: t.testoSecondario }]}>
+                  <Text
+                    style={[styles.dettaglio, { color: t.testoSecondario }]}
+                  >
                     {item.indirizzo}
                   </Text>
                 )}
@@ -113,7 +149,9 @@ export function SelettoreCliente({ visibile, onChiudi, onScegli }: Props) {
             ]}
             accessibilityRole="button"
           >
-            <Text style={[styles.bottoneTesto, { color: t.accento }]}>＋ Nuovo cliente</Text>
+            <Text style={[styles.bottoneTesto, { color: t.accento }]}>
+              ＋ Nuovo cliente
+            </Text>
           </Pressable>
         </View>
       </View>
@@ -134,7 +172,13 @@ const styles = StyleSheet.create({
     maxWidth: 720,
     alignSelf: 'center',
   },
-  maniglia: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 14 },
+  maniglia: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 14,
+  },
   testa: {
     flexDirection: 'row',
     justifyContent: 'space-between',

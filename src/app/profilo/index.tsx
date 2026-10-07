@@ -17,8 +17,14 @@ export default function ProfiloScreen() {
   return (
     <View style={[styles.container, { backgroundColor: t.sfondo }]}>
       <View style={[styles.barra, { paddingTop: insets.top + 12 }]}>
-        <Pressable onPress={tornaIndietro} hitSlop={12} accessibilityRole="button">
-          <Text style={[styles.indietro, { color: t.testoSecondario }]}>‹ Home</Text>
+        <Pressable
+          onPress={tornaIndietro}
+          hitSlop={12}
+          accessibilityRole="button"
+        >
+          <Text style={[styles.indietro, { color: t.testoSecondario }]}>
+            ‹ Home
+          </Text>
         </Pressable>
         <Text style={[styles.title, { color: t.testo }]}>Profilo Officina</Text>
         <Text style={[styles.sottotitolo, { color: t.testoSecondario }]}>

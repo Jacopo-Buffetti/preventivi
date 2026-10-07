@@ -1,4 +1,10 @@
-import { StyleSheet, Text, TextInput, TextInputProps, View } from 'react-native';
+import {
+  StyleSheet,
+  Text,
+  TextInput,
+  TextInputProps,
+  View,
+} from 'react-native';
 import { useTema } from '../../constants/tema';
 
 interface FormInputProps extends TextInputProps {
@@ -9,7 +15,9 @@ export function FormInput({ label, style, ...props }: FormInputProps) {
   const t = useTema();
   return (
     <View style={styles.fieldGroup}>
-      <Text style={[styles.label, { color: t.testoSecondario }]}>{label.toUpperCase()}</Text>
+      <Text style={[styles.label, { color: t.testoSecondario }]}>
+        {label.toUpperCase()}
+      </Text>
       <TextInput
         style={[
           styles.input,
@@ -25,7 +33,12 @@ export function FormInput({ label, style, ...props }: FormInputProps) {
 
 const styles = StyleSheet.create({
   fieldGroup: { marginBottom: 16 },
-  label: { fontSize: 12, fontWeight: '800', letterSpacing: 0.4, marginBottom: 6 },
+  label: {
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+    marginBottom: 6,
+  },
   input: {
     borderWidth: 1,
     borderRadius: 10,

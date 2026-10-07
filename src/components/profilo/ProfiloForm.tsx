@@ -54,10 +54,7 @@ export function ProfiloForm() {
 
   const handleSalva = async () => {
     if (!nomeAzienda.trim()) {
-      avviso(
-        'Attenzione',
-        "Inserisci il nome dell'azienda o della ditta."
-      );
+      avviso('Attenzione', "Inserisci il nome dell'azienda o della ditta.");
       return;
     }
 
@@ -95,7 +92,10 @@ export function ProfiloForm() {
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]}
+      contentContainerStyle={[
+        styles.content,
+        { paddingBottom: insets.bottom + 40 },
+      ]}
       keyboardShouldPersistTaps="handled"
     >
       <FormInput

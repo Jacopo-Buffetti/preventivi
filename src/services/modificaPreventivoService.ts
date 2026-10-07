@@ -1,10 +1,12 @@
-import { getDbConnection } from './db';
+import { adesso, getDbConnection } from './db';
 import { nuovoId } from './id';
 import type { PreventivoInput } from './databaseService';
 
 // Aggiorna un preventivo esistente con le sue voci.
 // Restano invariati numero, anno, data di emissione e stato: cambiano cliente,
 // oggetto, note, voci e totali. Le voci vecchie vengono sostituite da quelle nuove.
+// Il preventivo viene marcato da sincronizzare: le voci non hanno un flag
+// proprio, viaggiano sempre insieme al loro preventivo.
 export async function updatePreventivoWithVoci(
   idPreventivo: string,
   input: PreventivoInput
@@ -26,7 +28,8 @@ export async function updatePreventivoWithVoci(
     await db.runAsync(
       `UPDATE preventivi
        SET cliente_id = ?, oggetto = ?, aliquota_iva = ?, note_pagamento = ?,
-           totale_imponibile = ?, totale_iva = ?, totale_generale = ?
+           totale_imponibile = ?, totale_iva = ?, totale_generale = ?,
+           updated_at = ?, da_sincronizzare = 1
        WHERE id = ?;`,
       [
         input.cliente_id,
@@ -36,18 +39,28 @@ export async function updatePreventivoWithVoci(
         imponibile,
         totaleIva,
         totaleGenerale,
+        adesso(),
         idPreventivo,
       ]
     );
 
-    await db.runAsync('DELETE FROM voci_preventivo WHERE preventivo_id = ?;', [idPreventivo]);
+    await db.runAsync('DELETE FROM voci_preventivo WHERE preventivo_id = ?;', [
+      idPreventivo,
+    ]);
 
     for (const voce of vociCalcolate) {
       const voceId = nuovoId();
       await db.runAsync(
         `INSERT INTO voci_preventivo (id, preventivo_id, descrizione, quantita, prezzo_unitario, totale_voce)
          VALUES (?, ?, ?, ?, ?, ?);`,
-        [voceId, idPreventivo, voce.descrizione, voce.quantita, voce.prezzo_unitario, voce.totaleVoce]
+        [
+          voceId,
+          idPreventivo,
+          voce.descrizione,
+          voce.quantita,
+          voce.prezzo_unitario,
+          voce.totaleVoce,
+        ]
       );
     }
   });

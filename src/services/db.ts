@@ -2,6 +2,13 @@ import * as SQLite from 'expo-sqlite';
 
 export const DB_NAME = 'preventivi_fabbro.db';
 
+// Data e ora attuali in formato ISO (es. 2026-10-07T09:15:30.123Z).
+// Da usare per updated_at in ogni scrittura: è lo stesso formato che la
+// migrazione usa per le righe esistenti, così le date si confrontano bene.
+export function adesso(): string {
+  return new Date().toISOString();
+}
+
 // Un'unica connessione per tutta l'app.
 // Salviamo la Promise (non il db) così anche due chiamate contemporanee
 // ricevono la stessa connessione invece di aprirne due.

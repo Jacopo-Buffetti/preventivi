@@ -17,7 +17,8 @@ function esc(valore: string): string {
 function piega(riga: string): string {
   if (riga.length <= 75) return riga;
   const parti = [riga.slice(0, 75)];
-  for (let i = 75; i < riga.length; i += 74) parti.push(' ' + riga.slice(i, i + 74));
+  for (let i = 75; i < riga.length; i += 74)
+    parti.push(' ' + riga.slice(i, i + 74));
   return parti.join('\r\n');
 }
 
@@ -26,14 +27,20 @@ function piega(riga: string): string {
 function dividiNome(completo: string): { nome: string; cognome: string } {
   const parole = completo.trim().split(/\s+/);
   if (parole.length === 1) return { nome: parole[0], cognome: '' };
-  return { nome: parole.slice(0, -1).join(' '), cognome: parole[parole.length - 1] };
+  return {
+    nome: parole.slice(0, -1).join(' '),
+    cognome: parole[parole.length - 1],
+  };
 }
 
 // Da "data:image/png;base64,AAAA" ricava tipo ("PNG") e contenuto ("AAAA")
 function leggiFoto(dataUri?: string): { tipo: string; base64: string } | null {
   const corrispondenza = dataUri?.match(/^data:image\/(\w+);base64,(.+)$/);
   if (!corrispondenza) return null;
-  const tipo = corrispondenza[1].toUpperCase() === 'JPG' ? 'JPEG' : corrispondenza[1].toUpperCase();
+  const tipo =
+    corrispondenza[1].toUpperCase() === 'JPG'
+      ? 'JPEG'
+      : corrispondenza[1].toUpperCase();
   return { tipo, base64: corrispondenza[2] };
 }
 
@@ -50,12 +57,17 @@ export function creaVCard(b: Biglietto): string {
   ];
 
   if (pulito(b.qualifica)) righe.push(`TITLE:${esc(pulito(b.qualifica))}`);
-  if (pulito(b.telefono)) righe.push(`TEL;TYPE=WORK,VOICE:${esc(pulito(b.telefono))}`);
-  if (pulito(b.cellulare)) righe.push(`TEL;TYPE=CELL:${esc(pulito(b.cellulare))}`);
-  if (pulito(b.email)) righe.push(`EMAIL;TYPE=INTERNET,WORK:${esc(pulito(b.email))}`);
-  if (pulito(b.email_secondaria)) righe.push(`EMAIL;TYPE=INTERNET:${esc(pulito(b.email_secondaria))}`);
+  if (pulito(b.telefono))
+    righe.push(`TEL;TYPE=WORK,VOICE:${esc(pulito(b.telefono))}`);
+  if (pulito(b.cellulare))
+    righe.push(`TEL;TYPE=CELL:${esc(pulito(b.cellulare))}`);
+  if (pulito(b.email))
+    righe.push(`EMAIL;TYPE=INTERNET,WORK:${esc(pulito(b.email))}`);
+  if (pulito(b.email_secondaria))
+    righe.push(`EMAIL;TYPE=INTERNET:${esc(pulito(b.email_secondaria))}`);
   // L'indirizzo è un'unica riga: va nel campo "via" dell'indirizzo vCard
-  if (pulito(b.indirizzo)) righe.push(`ADR;TYPE=WORK:;;${esc(pulito(b.indirizzo))};;;;`);
+  if (pulito(b.indirizzo))
+    righe.push(`ADR;TYPE=WORK:;;${esc(pulito(b.indirizzo))};;;;`);
 
   const foto = leggiFoto(b.logo);
   if (foto) righe.push(`PHOTO;ENCODING=b;TYPE=${foto.tipo}:${foto.base64}`);

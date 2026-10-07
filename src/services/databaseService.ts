@@ -1,4 +1,4 @@
-import { getDbConnection } from './db';
+import { adesso, getDbConnection } from './db';
 import { nuovoId } from './id';
 
 // --- INTERFACCE ---
@@ -90,7 +90,8 @@ export async function updateProfiloFabbro(
     await db.runAsync(
       `UPDATE profilo_fabbro SET 
         nome_azienda = ?, titolare = ?, p_iva = ?, codice_fiscale = ?, 
-        telefono = ?, email = ?, indirizzo = ?, iban = ? 
+        telefono = ?, email = ?, indirizzo = ?, iban = ?,
+        updated_at = ?, da_sincronizzare = 1
        WHERE id = ?;`,
       [
         profilo.nome_azienda,
@@ -101,14 +102,16 @@ export async function updateProfiloFabbro(
         profilo.email || '',
         profilo.indirizzo || '',
         profilo.iban || '',
+        adesso(),
         esistente.id!,
       ]
     );
   } else {
     await db.runAsync(
       `INSERT INTO profilo_fabbro 
-        (nome_azienda, titolare, p_iva, codice_fiscale, telefono, email, indirizzo, iban)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
+        (nome_azienda, titolare, p_iva, codice_fiscale, telefono, email, indirizzo, iban,
+         updated_at, da_sincronizzare)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1);`,
       [
         profilo.nome_azienda,
         profilo.titolare || '',
@@ -118,6 +121,7 @@ export async function updateProfiloFabbro(
         profilo.email || '',
         profilo.indirizzo || '',
         profilo.iban || '',
+        adesso(),
       ]
     );
   }
@@ -127,14 +131,14 @@ export async function updateProfiloFabbro(
 export async function getClienti(): Promise<Cliente[]> {
   const db = await getDbConnection();
   return await db.getAllAsync<Cliente>(
-    'SELECT * FROM clienti ORDER BY nome ASC;'
+    'SELECT * FROM clienti WHERE deleted_at IS NULL ORDER BY nome ASC;'
   );
 }
 
 export async function getClienteById(id: string): Promise<Cliente | null> {
   const db = await getDbConnection();
   return await db.getFirstAsync<Cliente>(
-    'SELECT * FROM clienti WHERE id = ?;',
+    'SELECT * FROM clienti WHERE id = ? AND deleted_at IS NULL;',
     [id]
   );
 }
@@ -145,7 +149,8 @@ export async function addCliente(
   const db = await getDbConnection();
   const id = nuovoId();
   await db.runAsync(
-    `INSERT INTO clienti (id, nome, telefono, email, indirizzo, note) VALUES (?, ?, ?, ?, ?, ?);`,
+    `INSERT INTO clienti (id, nome, telefono, email, indirizzo, note, updated_at, da_sincronizzare)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 1);`,
     [
       id,
       cliente.nome,
@@ -153,6 +158,7 @@ export async function addCliente(
       cliente.email || '',
       cliente.indirizzo || '',
       cliente.note || '',
+      adesso(),
     ]
   );
   return id;
@@ -164,26 +170,54 @@ export async function updateCliente(
 ): Promise<void> {
   const db = await getDbConnection();
   await db.runAsync(
-    `UPDATE clienti SET nome = ?, telefono = ?, email = ?, indirizzo = ?, note = ? WHERE id = ?;`,
+    `UPDATE clienti
+     SET nome = ?, telefono = ?, email = ?, indirizzo = ?, note = ?,
+         updated_at = ?, da_sincronizzare = 1
+     WHERE id = ?;`,
     [
       cliente.nome || '',
       cliente.telefono || '',
       cliente.email || '',
       cliente.indirizzo || '',
       cliente.note || '',
+      adesso(),
       id,
     ]
   );
 }
 
+// Cancellazione "soft": la riga resta, con la data di cancellazione.
+// Così il dispositivo che sincronizza dopo scopre che il cliente va tolto.
+//
+// Prima il blocco "cliente con preventivi" lo faceva il database con
+// ON DELETE RESTRICT; con un UPDATE quel vincolo non scatta più, quindi
+// il controllo lo facciamo qui. La schermata lo verifica già, questo è
+// una sicurezza in più se un domani la funzione viene chiamata altrove.
 export async function deleteCliente(id: string): Promise<void> {
   const db = await getDbConnection();
-  await db.runAsync('DELETE FROM clienti WHERE id = ?;', [id]);
+
+  const conPreventivi = await db.getFirstAsync<{ n: number }>(
+    'SELECT COUNT(*) AS n FROM preventivi WHERE cliente_id = ? AND deleted_at IS NULL;',
+    [id]
+  );
+  if ((conPreventivi?.n ?? 0) > 0) {
+    throw new Error('Il cliente ha ancora dei preventivi: eliminali prima.');
+  }
+
+  const ora = adesso();
+  await db.runAsync(
+    `UPDATE clienti
+     SET deleted_at = ?, updated_at = ?, da_sincronizzare = 1
+     WHERE id = ?;`,
+    [ora, ora, id]
+  );
 }
 
 // --- PREVENTIVI ---
 
-// Prossimo numero progressivo per l'anno indicato (1, 2, 3... ripartendo ogni anno)
+// Prossimo numero progressivo per l'anno indicato (1, 2, 3... ripartendo ogni anno).
+// Conta anche i preventivi cancellati: un numero già usato non viene
+// riassegnato, così non esistono mai due documenti diversi con lo stesso numero.
 export async function getProssimoNumeroPreventivo(
   anno: number = new Date().getFullYear()
 ): Promise<number> {
@@ -226,8 +260,9 @@ export async function savePreventivoWithVoci(
     // Inserimento Testata
     await db.runAsync(
       `INSERT INTO preventivi 
-        (id, cliente_id, numero_preventivo, anno, data_creazione, oggetto, stato, aliquota_iva, note_pagamento, totale_imponibile, totale_iva, totale_generale)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+        (id, cliente_id, numero_preventivo, anno, data_creazione, oggetto, stato, aliquota_iva, note_pagamento, totale_imponibile, totale_iva, totale_generale,
+         updated_at, da_sincronizzare)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1);`,
       [
         preventivoId,
         input.cliente_id,
@@ -241,6 +276,7 @@ export async function savePreventivoWithVoci(
         imponibile,
         totaleIva,
         totaleGenerale,
+        dataCreazione,
       ]
     );
 
@@ -270,7 +306,9 @@ export async function getPreventiviByClienteId(
 ): Promise<Preventivo[]> {
   const db = await getDbConnection();
   return await db.getAllAsync<Preventivo>(
-    'SELECT * FROM preventivi WHERE cliente_id = ? ORDER BY data_creazione DESC;',
+    `SELECT * FROM preventivi
+     WHERE cliente_id = ? AND deleted_at IS NULL
+     ORDER BY data_creazione DESC;`,
     [clienteId]
   );
 }
@@ -281,6 +319,7 @@ export async function getAllPreventivi(): Promise<Preventivo[]> {
     SELECT p.*, c.nome as cliente_nome 
     FROM preventivi p
     JOIN clienti c ON p.cliente_id = c.id
+    WHERE p.deleted_at IS NULL
     ORDER BY p.data_creazione DESC;
   `);
 }
@@ -297,7 +336,7 @@ export async function getPreventivoById(
             c.telefono AS cliente_telefono
      FROM preventivi p
      LEFT JOIN clienti c ON p.cliente_id = c.id
-     WHERE p.id = ?;`,
+     WHERE p.id = ? AND p.deleted_at IS NULL;`,
     [id]
   );
 }
@@ -318,20 +357,24 @@ export async function updateStatoPreventivo(
   stato: StatoPreventivo
 ): Promise<void> {
   const db = await getDbConnection();
-  await db.runAsync('UPDATE preventivi SET stato = ? WHERE id = ?;', [
-    stato,
-    id,
-  ]);
+  await db.runAsync(
+    `UPDATE preventivi
+     SET stato = ?, updated_at = ?, da_sincronizzare = 1
+     WHERE id = ?;`,
+    [stato, adesso(), id]
+  );
 }
 
+// Cancellazione "soft" del preventivo.
+// Le voci restano nel database ma non si vedono più: si leggono sempre
+// passando dal preventivo, che ora risulta cancellato.
 export async function deletePreventivo(id: string): Promise<void> {
   const db = await getDbConnection();
-  // Le voci verrebbero cancellate anche dal vincolo ON DELETE CASCADE:
-  // le eliminiamo esplicitamente per non dipendere da PRAGMA foreign_keys.
-  await db.withTransactionAsync(async () => {
-    await db.runAsync('DELETE FROM voci_preventivo WHERE preventivo_id = ?;', [
-      id,
-    ]);
-    await db.runAsync('DELETE FROM preventivi WHERE id = ?;', [id]);
-  });
+  const ora = adesso();
+  await db.runAsync(
+    `UPDATE preventivi
+    SET deleted_at = ?, updated_at = ?, da_sincronizzare = 1
+    WHERE id = ?;`,
+    [ora, ora, id]
+  );
 }

@@ -20,12 +20,19 @@ import {
   type Preventivo,
 } from '../../services/databaseService';
 import { avviso, conferma } from '../../utils/dialoghi';
-import { formattaData, formattaEuro, formattaNumeroPreventivo } from '../../utils/formato';
+import {
+  formattaData,
+  formattaEuro,
+  formattaNumeroPreventivo,
+} from '../../utils/formato';
 
 // "Mario Rossi" → "MR"
 function iniziali(nome: string): string {
   const parole = nome.trim().split(/\s+/).filter(Boolean);
-  const lettere = parole.length > 1 ? parole[0][0] + parole[parole.length - 1][0] : parole[0]?.slice(0, 2) ?? '?';
+  const lettere =
+    parole.length > 1
+      ? parole[0][0] + parole[parole.length - 1][0]
+      : (parole[0]?.slice(0, 2) ?? '?');
   return lettere.toUpperCase();
 }
 
@@ -51,7 +58,10 @@ export default function DettaglioClienteScreen() {
   useFocusEffect(
     useCallback(() => {
       if (!idCliente) return;
-      Promise.all([getClienteById(idCliente), getPreventiviByClienteId(idCliente)])
+      Promise.all([
+        getClienteById(idCliente),
+        getPreventiviByClienteId(idCliente),
+      ])
         .then(([c, p]) => {
           setCliente(c);
           setPreventivi(p);
@@ -71,16 +81,24 @@ export default function DettaglioClienteScreen() {
   };
 
   const apri = (url: string) =>
-    Linking.openURL(url).catch(() => avviso('Errore', "Impossibile aprire l'app richiesta."));
+    Linking.openURL(url).catch(() =>
+      avviso('Errore', "Impossibile aprire l'app richiesta.")
+    );
 
   const modifica = () => {
     if (!cliente) return;
-    router.push({ pathname: '/clienti/nuovo', params: { idCliente: cliente.id } });
+    router.push({
+      pathname: '/clienti/nuovo',
+      params: { idCliente: cliente.id },
+    });
   };
 
   const nuovoPreventivo = () => {
     if (!cliente) return;
-    router.push({ pathname: '/preventivi/nuovo', params: { idCliente: cliente.id } });
+    router.push({
+      pathname: '/preventivi/nuovo',
+      params: { idCliente: cliente.id },
+    });
   };
 
   const elimina = async () => {
@@ -126,16 +144,23 @@ export default function DettaglioClienteScreen() {
   if (!cliente) {
     return (
       <View style={[styles.centro, { backgroundColor: t.sfondo }]}>
-        <Text style={[styles.titoloVuoto, { color: t.testo }]}>Cliente non trovato</Text>
+        <Text style={[styles.titoloVuoto, { color: t.testo }]}>
+          Cliente non trovato
+        </Text>
         <Text style={[styles.testoVuoto, { color: t.testoSecondario }]}>
           Potrebbe essere stato eliminato.
         </Text>
         <Pressable
           onPress={() => router.replace('/clienti')}
-          style={[styles.bottoneContorno, { borderColor: t.bordo, marginTop: 20 }]}
+          style={[
+            styles.bottoneContorno,
+            { borderColor: t.bordo, marginTop: 20 },
+          ]}
           accessibilityRole="button"
         >
-          <Text style={[styles.bottoneContornoTesto, { color: t.testo }]}>Torna alla rubrica</Text>
+          <Text style={[styles.bottoneContornoTesto, { color: t.testo }]}>
+            Torna alla rubrica
+          </Text>
         </Pressable>
       </View>
     );
@@ -149,8 +174,14 @@ export default function DettaglioClienteScreen() {
     <View style={[styles.container, { backgroundColor: t.sfondo }]}>
       {/* Barra superiore: resta sotto la barra di stato del telefono */}
       <View style={[styles.barra, { paddingTop: insets.top + 12 }]}>
-        <Pressable onPress={tornaAllaRubrica} hitSlop={12} accessibilityRole="button">
-          <Text style={[styles.indietro, { color: t.testoSecondario }]}>‹ Clienti</Text>
+        <Pressable
+          onPress={tornaAllaRubrica}
+          hitSlop={12}
+          accessibilityRole="button"
+        >
+          <Text style={[styles.indietro, { color: t.testoSecondario }]}>
+            ‹ Clienti
+          </Text>
         </Pressable>
         <Pressable
           onPress={modifica}
@@ -162,15 +193,29 @@ export default function DettaglioClienteScreen() {
           accessibilityRole="button"
           accessibilityLabel="Modifica contatto"
         >
-          <Text style={[styles.pillModificaTesto, { color: t.accento }]}>✎  Modifica</Text>
+          <Text style={[styles.pillModificaTesto, { color: t.accento }]}>
+            ✎ Modifica
+          </Text>
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={[styles.contenuto, { paddingBottom: 32 }]}>
+      <ScrollView
+        contentContainerStyle={[styles.contenuto, { paddingBottom: 32 }]}
+      >
         {/* Testata con avatar */}
-        <View style={[styles.hero, { backgroundColor: t.card, borderColor: t.bordo }]}>
+        <View
+          style={[
+            styles.hero,
+            { backgroundColor: t.card, borderColor: t.bordo },
+          ]}
+        >
           <View style={styles.heroRiga}>
-            <View style={[styles.avatar, { backgroundColor: 'rgba(245,158,11,0.15)' }]}>
+            <View
+              style={[
+                styles.avatar,
+                { backgroundColor: 'rgba(245,158,11,0.15)' },
+              ]}
+            >
               <Text style={[styles.avatarTesto, { color: t.accento }]}>
                 {iniziali(cliente.nome)}
               </Text>
@@ -180,7 +225,10 @@ export default function DettaglioClienteScreen() {
                 {cliente.nome}
               </Text>
               {!!cliente.indirizzo && (
-                <Text style={[styles.sottotitolo, { color: t.testoSecondario }]} numberOfLines={2}>
+                <Text
+                  style={[styles.sottotitolo, { color: t.testoSecondario }]}
+                  numberOfLines={2}
+                >
                   📍 {cliente.indirizzo}
                 </Text>
               )}
@@ -194,14 +242,18 @@ export default function DettaglioClienteScreen() {
               etichetta="Chiama"
               t={t}
               attiva={!!cliente.telefono}
-              onPress={() => apri(`tel:${cliente.telefono!.replace(/\s/g, '')}`)}
+              onPress={() =>
+                apri(`tel:${cliente.telefono!.replace(/\s/g, '')}`)
+              }
             />
             <AzioneRapida
               icona="💬"
               etichetta="WhatsApp"
               t={t}
               attiva={!!cliente.telefono}
-              onPress={() => apri(`https://wa.me/${numeroWhatsApp(cliente.telefono!)}`)}
+              onPress={() =>
+                apri(`https://wa.me/${numeroWhatsApp(cliente.telefono!)}`)
+              }
             />
             <AzioneRapida
               icona="✉️"
@@ -215,16 +267,34 @@ export default function DettaglioClienteScreen() {
 
         {/* Dati del contatto */}
         <Etichetta testo="CONTATTI" t={t} />
-        <View style={[styles.card, { backgroundColor: t.card, borderColor: t.bordo }]}>
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: t.card, borderColor: t.bordo },
+          ]}
+        >
           <RigaInfo etichetta="Telefono" valore={cliente.telefono} t={t} />
           <RigaInfo etichetta="Email" valore={cliente.email} t={t} />
-          <RigaInfo etichetta="Indirizzo" valore={cliente.indirizzo} t={t} ultima={!cliente.note} />
-          {!!cliente.note && <RigaInfo etichetta="Note" valore={cliente.note} t={t} ultima />}
+          <RigaInfo
+            etichetta="Indirizzo"
+            valore={cliente.indirizzo}
+            t={t}
+            ultima={!cliente.note}
+          />
+          {!!cliente.note && (
+            <RigaInfo etichetta="Note" valore={cliente.note} t={t} ultima />
+          )}
         </View>
 
         {/* Preventivi */}
         <View style={styles.intestazioneSezione}>
-          <Text style={[styles.etichetta, styles.senzaMargine, { color: t.testoSecondario }]}>
+          <Text
+            style={[
+              styles.etichetta,
+              styles.senzaMargine,
+              { color: t.testoSecondario },
+            ]}
+          >
             PREVENTIVI ({preventivi.length})
           </Text>
           {totaleAccettati > 0 && (
@@ -235,7 +305,13 @@ export default function DettaglioClienteScreen() {
         </View>
 
         {preventivi.length === 0 ? (
-          <View style={[styles.card, styles.vuotoCard, { backgroundColor: t.card, borderColor: t.bordo }]}>
+          <View
+            style={[
+              styles.card,
+              styles.vuotoCard,
+              { backgroundColor: t.card, borderColor: t.bordo },
+            ]}
+          >
             <Text style={[styles.testoVuoto, { color: t.testoSecondario }]}>
               Nessun preventivo per questo cliente.
             </Text>
@@ -264,18 +340,34 @@ export default function DettaglioClienteScreen() {
                     N° {formattaNumeroPreventivo(p.anno, p.numero_preventivo)}
                   </Text>
                   <View
-                    style={[styles.badge, { backgroundColor: stato.sfondo, borderColor: stato.colore }]}
+                    style={[
+                      styles.badge,
+                      {
+                        backgroundColor: stato.sfondo,
+                        borderColor: stato.colore,
+                      },
+                    ]}
                   >
-                    <Text style={[styles.badgeTesto, { color: stato.colore }]}>{stato.etichetta}</Text>
+                    <Text style={[styles.badgeTesto, { color: stato.colore }]}>
+                      {stato.etichetta}
+                    </Text>
                   </View>
                 </View>
                 {!!p.oggetto && (
-                  <Text style={[styles.preventivoOggetto, { color: t.testo }]} numberOfLines={1}>
+                  <Text
+                    style={[styles.preventivoOggetto, { color: t.testo }]}
+                    numberOfLines={1}
+                  >
                     {p.oggetto}
                   </Text>
                 )}
                 <View style={styles.preventivoPiede}>
-                  <Text style={[styles.preventivoData, { color: t.testoSecondario }]}>
+                  <Text
+                    style={[
+                      styles.preventivoData,
+                      { color: t.testoSecondario },
+                    ]}
+                  >
                     {formattaData(p.data_creazione)}
                   </Text>
                   <Text style={[styles.preventivoTotale, { color: t.accento }]}>
@@ -297,7 +389,9 @@ export default function DettaglioClienteScreen() {
           ]}
           accessibilityRole="button"
         >
-          <Text style={styles.bottonePrimarioTesto}>＋ Nuovo preventivo per questo cliente</Text>
+          <Text style={styles.bottonePrimarioTesto}>
+            ＋ Nuovo preventivo per questo cliente
+          </Text>
         </Pressable>
 
         <Pressable
@@ -305,7 +399,9 @@ export default function DettaglioClienteScreen() {
           style={({ pressed }) => [styles.elimina, pressed && { opacity: 0.6 }]}
           accessibilityRole="button"
         >
-          <Text style={[styles.eliminaTesto, { color: t.pericolo }]}>Elimina contatto</Text>
+          <Text style={[styles.eliminaTesto, { color: t.pericolo }]}>
+            Elimina contatto
+          </Text>
         </Pressable>
       </ScrollView>
     </View>
@@ -315,7 +411,11 @@ export default function DettaglioClienteScreen() {
 // --- Componenti di supporto ---
 
 function Etichetta({ testo, t }: { testo: string; t: Tema }) {
-  return <Text style={[styles.etichetta, { color: t.testoSecondario }]}>{testo}</Text>;
+  return (
+    <Text style={[styles.etichetta, { color: t.testoSecondario }]}>
+      {testo}
+    </Text>
+  );
 }
 
 function AzioneRapida({
@@ -362,10 +462,20 @@ function RigaInfo({
   ultima?: boolean;
 }) {
   return (
-    <View style={[styles.rigaInfo, !ultima && { borderBottomWidth: 1, borderBottomColor: t.bordo }]}>
-      <Text style={[styles.rigaEtichetta, { color: t.testoSecondario }]}>{etichetta}</Text>
+    <View
+      style={[
+        styles.rigaInfo,
+        !ultima && { borderBottomWidth: 1, borderBottomColor: t.bordo },
+      ]}
+    >
+      <Text style={[styles.rigaEtichetta, { color: t.testoSecondario }]}>
+        {etichetta}
+      </Text>
       <Text
-        style={[styles.rigaValore, { color: valore ? t.testo : t.testoSecondario }]}
+        style={[
+          styles.rigaValore,
+          { color: valore ? t.testo : t.testoSecondario },
+        ]}
         selectable
       >
         {valore || '—'}
@@ -378,7 +488,12 @@ function RigaInfo({
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  centro: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
+  centro: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
   titoloVuoto: { fontSize: 18, fontWeight: '800' },
   testoVuoto: { fontSize: 14, marginTop: 6, textAlign: 'center' },
 
@@ -401,7 +516,12 @@ const styles = StyleSheet.create({
   },
   pillModificaTesto: { fontSize: 14, fontWeight: '700' },
 
-  contenuto: { paddingHorizontal: 16, width: '100%', maxWidth: 720, alignSelf: 'center' },
+  contenuto: {
+    paddingHorizontal: 16,
+    width: '100%',
+    maxWidth: 720,
+    alignSelf: 'center',
+  },
 
   hero: { borderWidth: 1, borderRadius: 18, padding: 16 },
   heroRiga: { flexDirection: 'row', alignItems: 'center', gap: 14 },
@@ -454,7 +574,12 @@ const styles = StyleSheet.create({
   accettati: { fontSize: 12, fontWeight: '800' },
   vuotoCard: { paddingVertical: 16 },
 
-  preventivo: { borderWidth: 1, borderRadius: 12, padding: 14, marginBottom: 10 },
+  preventivo: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+  },
   preventivoTesta: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -462,7 +587,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   preventivoNumero: { fontSize: 16, fontWeight: '800' },
-  badge: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 },
+  badge: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+  },
   badgeTesto: { fontSize: 11, fontWeight: '800', letterSpacing: 0.4 },
   preventivoOggetto: { fontSize: 14, fontWeight: '600', marginTop: 6 },
   preventivoPiede: {
@@ -474,13 +604,28 @@ const styles = StyleSheet.create({
   preventivoData: { fontSize: 13 },
   preventivoTotale: { fontSize: 15, fontWeight: '800' },
 
-  bottonePrimario: { borderRadius: 12, paddingVertical: 16, alignItems: 'center', marginTop: 16 },
+  bottonePrimario: {
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginTop: 16,
+  },
   bottonePrimarioTesto: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
 
-  bottoneContorno: { borderWidth: 1, borderRadius: 10, paddingVertical: 12, paddingHorizontal: 20 },
+  bottoneContorno: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+  },
   bottoneContornoTesto: { fontSize: 15, fontWeight: '700' },
 
-  elimina: { alignSelf: 'center', paddingVertical: 14, paddingHorizontal: 20, marginTop: 8 },
+  elimina: {
+    alignSelf: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    marginTop: 8,
+  },
   eliminaTesto: { fontSize: 14, fontWeight: '700' },
 
   premuto: { opacity: 0.85, transform: [{ scale: 0.98 }] },

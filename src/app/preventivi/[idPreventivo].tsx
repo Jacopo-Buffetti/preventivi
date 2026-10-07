@@ -110,7 +110,10 @@ export default function DettaglioPreventivoScreen() {
       setGenerandoPdf(true);
       const uri = await generaPdfPreventivo(preventivo.id);
 
-      const filename = nomeFilePreventivo(preventivo.anno, preventivo.numero_preventivo);
+      const filename = nomeFilePreventivo(
+        preventivo.anno,
+        preventivo.numero_preventivo
+      );
       // Se la copia fallisce si stampa comunque il file generato
       let daStampare = uri;
       try {
@@ -351,7 +354,9 @@ export default function DettaglioPreventivoScreen() {
           accessibilityRole="button"
           accessibilityLabel="Modifica preventivo"
         >
-          <Text style={[styles.pillModificaTesto, { color: t.accento }]}>✎  Modifica</Text>
+          <Text style={[styles.pillModificaTesto, { color: t.accento }]}>
+            ✎ Modifica
+          </Text>
         </Pressable>
       </View>
 

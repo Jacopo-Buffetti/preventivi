@@ -173,10 +173,18 @@ export default function HomeScreen() {
         {/* Azione principale */}
         <View style={[styles.hero, { backgroundColor: t.hero }]}>
           <View
-            style={[styles.decoro, styles.decoroGrande, { backgroundColor: t.accento }]}
+            style={[
+              styles.decoro,
+              styles.decoroGrande,
+              { backgroundColor: t.accento },
+            ]}
           />
           <View
-            style={[styles.decoro, styles.decoroPiccolo, { backgroundColor: t.accento }]}
+            style={[
+              styles.decoro,
+              styles.decoroPiccolo,
+              { backgroundColor: t.accento },
+            ]}
           />
           <Text style={[styles.heroEtichetta, { color: t.heroSecondario }]}>
             AZIONE RAPIDA
@@ -216,7 +224,15 @@ export default function HomeScreen() {
   );
 }
 
-function CardMenu({ voce, t, scuro }: { voce: VoceMenu; t: Tema; scuro: boolean }) {
+function CardMenu({
+  voce,
+  t,
+  scuro,
+}: {
+  voce: VoceMenu;
+  t: Tema;
+  scuro: boolean;
+}) {
   return (
     <Link href={voce.href} asChild>
       <Pressable
@@ -239,7 +255,9 @@ function CardMenu({ voce, t, scuro }: { voce: VoceMenu; t: Tema; scuro: boolean 
           </View>
           <Text style={[styles.freccia, { color: t.testoSecondario }]}>↗</Text>
         </View>
-        <Text style={[styles.cardTitolo, { color: t.testo }]}>{voce.titolo}</Text>
+        <Text style={[styles.cardTitolo, { color: t.testo }]}>
+          {voce.titolo}
+        </Text>
         <Text
           style={[styles.cardDescrizione, { color: t.testoSecondario }]}
           numberOfLines={2}
@@ -288,7 +306,13 @@ const styles = StyleSheet.create({
   },
   decoro: { position: 'absolute', borderRadius: 999, opacity: 0.18 },
   decoroGrande: { width: 220, height: 220, top: -90, right: -70 },
-  decoroPiccolo: { width: 90, height: 90, bottom: -30, right: 70, opacity: 0.12 },
+  decoroPiccolo: {
+    width: 90,
+    height: 90,
+    bottom: -30,
+    right: 70,
+    opacity: 0.12,
+  },
   heroEtichetta: { fontSize: 12, fontWeight: '700', letterSpacing: 1.2 },
   heroTitolo: {
     fontSize: 24,

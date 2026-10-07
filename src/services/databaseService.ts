@@ -1,4 +1,5 @@
 import { getDbConnection } from './db';
+import { nuovoId } from './id';
 
 // --- INTERFACCE ---
 export interface ProfiloFabbro {
@@ -142,7 +143,7 @@ export async function addCliente(
   cliente: Omit<Cliente, 'id'>
 ): Promise<string> {
   const db = await getDbConnection();
-  const id = `CLI-${Date.now()}`;
+  const id = nuovoId();
   await db.runAsync(
     `INSERT INTO clienti (id, nome, telefono, email, indirizzo, note) VALUES (?, ?, ?, ?, ?, ?);`,
     [
@@ -203,7 +204,9 @@ export async function savePreventivoWithVoci(
   // Calcolo del prossimo numero progressivo per l'anno corrente
   const prossimoNumero = await getProssimoNumeroPreventivo(annoCorrente);
 
-  const preventivoId = `PREV-${annoCorrente}-${prossimoNumero}`;
+  // L'ID è un UUID e non contiene più anno e numero: il numero progressivo
+  // resta nelle colonne numero_preventivo e anno, ed è quello mostrato all'utente.
+  const preventivoId = nuovoId();
   const dataCreazione = new Date().toISOString();
   const aliquotaIva = input.aliquota_iva ?? 22;
 
@@ -243,7 +246,7 @@ export async function savePreventivoWithVoci(
 
     // Inserimento Dettaglio Voci
     for (const voce of vociCalcolate) {
-      const voceId = `VOCE-${Math.random().toString(36).substring(2, 9)}`;
+      const voceId = nuovoId();
       await db.runAsync(
         `INSERT INTO voci_preventivo (id, preventivo_id, descrizione, quantita, prezzo_unitario, totale_voce)
          VALUES (?, ?, ?, ?, ?, ?);`,

@@ -28,6 +28,7 @@ import {
 } from '../../services/databaseService';
 import {
   condividiPdfPreventivo,
+  copiaConNome,
   generaPdfPreventivo,
 } from '../../services/pdfService';
 import { avviso, conferma } from '../../utils/dialoghi';
@@ -35,6 +36,7 @@ import {
   formattaData,
   formattaEuro,
   formattaNumeroPreventivo,
+  nomeFilePreventivo,
 } from '../../utils/formato';
 
 export default function DettaglioPreventivoScreen() {
@@ -108,12 +110,16 @@ export default function DettaglioPreventivoScreen() {
       setGenerandoPdf(true);
       const uri = await generaPdfPreventivo(preventivo.id);
 
-      const filename = `preventivo-${preventivo.id}.pdf`;
-      const dest =
-        (FileSystem.documentDirectory || FileSystem.cacheDirectory) + filename;
+      const filename = nomeFilePreventivo(preventivo.anno, preventivo.numero_preventivo);
+      // Se la copia fallisce si stampa comunque il file generato
+      let daStampare = uri;
       try {
-        await FileSystem.copyAsync({ from: uri, to: dest });
-        avviso('Salvato', `PDF salvato in ${dest}`);
+        daStampare = await copiaConNome(
+          uri,
+          FileSystem.documentDirectory || FileSystem.cacheDirectory!,
+          filename
+        );
+        avviso('Salvato', `PDF salvato in ${daStampare}`);
       } catch (copyErr) {
         console.warn(
           'Impossibile salvare il PDF in documentDirectory, uso percorso temporaneo',
@@ -123,7 +129,7 @@ export default function DettaglioPreventivoScreen() {
 
       // Apri la UI di stampa sul file salvato (se disponibile)
       try {
-        await Print.printAsync({ uri: dest || uri });
+        await Print.printAsync({ uri: daStampare });
       } catch (printErr) {
         console.error(printErr);
         avviso('Errore', 'Impossibile aprire la stampa.');

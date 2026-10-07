@@ -7,7 +7,11 @@ import {
   htmlPreventivo,
   type DatiPdfPreventivo,
 } from '../pdf/templatePreventivo';
-import { formattaData, formattaNumeroPreventivo } from '../utils/formato';
+import {
+  formattaData,
+  formattaNumeroPreventivo,
+  nomeFilePreventivo,
+} from '../utils/formato';
 import {
   getPreventivoById,
   getProfiloFabbro,
@@ -25,9 +29,12 @@ function importo(valore: number): string {
   });
 }
 
+// Restituisce i dati per il template e il nome del file PDF.
+// Il nome usa anno e numero (preventivo-2026-005.pdf) e non l'ID interno,
+// che ora è un UUID poco leggibile per il cliente che riceve il file.
 async function costruisciDati(
   idPreventivo: string
-): Promise<DatiPdfPreventivo> {
+): Promise<{ dati: DatiPdfPreventivo; nomeFile: string }> {
   const [preventivo, voci, profilo] = await Promise.all([
     getPreventivoById(idPreventivo),
     getVociByPreventivoId(idPreventivo),
@@ -36,7 +43,7 @@ async function costruisciDati(
 
   if (!preventivo) throw new Error(`Preventivo ${idPreventivo} non trovato`);
 
-  return {
+  const dati: DatiPdfPreventivo = {
     numero: formattaNumeroPreventivo(
       preventivo.anno,
       preventivo.numero_preventivo
@@ -78,6 +85,11 @@ async function costruisciDati(
     modalitaPagamento: DOCUMENTO.modalitaPagamento,
     slogan: DOCUMENTO.slogan,
   };
+
+  return {
+    dati,
+    nomeFile: nomeFilePreventivo(preventivo.anno, preventivo.numero_preventivo),
+  };
 }
 
 // Genera il PDF del preventivo e apre la condivisione (WhatsApp, email, Drive...).
@@ -85,7 +97,7 @@ async function costruisciDati(
 export async function condividiPdfPreventivo(
   idPreventivo: string
 ): Promise<void> {
-  const dati = await costruisciDati(idPreventivo);
+  const { dati, nomeFile } = await costruisciDati(idPreventivo);
   const html = htmlPreventivo(dati);
 
   if (Platform.OS === 'web') {
@@ -93,38 +105,7 @@ export async function condividiPdfPreventivo(
     return;
   }
 
-  const { uri } = await Print.printToFileAsync({ html, ...A4 });
-  // Some Android devices restrict direct sharing from the temporary
-  // print location. Copying the file into the app cache directory
-  // ensures Sharing can read it reliably.
-  let uriToShare = uri;
-  try {
-    const filename = `preventivo-${idPreventivo}.pdf`;
-    const dest = FileSystem.cacheDirectory + filename;
-    // Copy the file to cache (overwrite if exists)
-    await FileSystem.copyAsync({ from: uri, to: dest });
-    uriToShare = dest;
-  } catch (copyErr) {
-    // If copy fails, try to obtain a content:// URI on Android so other apps can read it
-    console.warn(
-      'Impossibile copiare il PDF in cache, provo a ottenere content URI',
-      copyErr
-    );
-    try {
-      if (Platform.OS === 'android' && FileSystem.getContentUriAsync) {
-        const contentUri = await FileSystem.getContentUriAsync(uri);
-        uriToShare = contentUri;
-      } else {
-        uriToShare = uri;
-      }
-    } catch (contentErr) {
-      console.warn(
-        'Impossibile ottenere content URI, uso il percorso originale',
-        contentErr
-      );
-      uriToShare = uri;
-    }
-  }
+  const uriToShare = await creaFilePdf(html, nomeFile);
 
   if (await Sharing.isAvailableAsync()) {
     try {
@@ -152,34 +133,60 @@ export async function condividiPdfPreventivo(
 export async function generaPdfPreventivo(
   idPreventivo: string
 ): Promise<string> {
-  const dati = await costruisciDati(idPreventivo);
+  const { dati, nomeFile } = await costruisciDati(idPreventivo);
   const html = htmlPreventivo(dati);
 
-  const { uri } = await Print.printToFileAsync({ html, ...A4 });
+  return creaFilePdf(html, nomeFile);
+}
 
-  // Copia su cache per compatibilità con Sharing su Android
+// Copia un file in una cartella con il nome indicato.
+// Se esiste già un file con quel nome (preventivo condiviso o salvato in
+// precedenza) viene prima eliminato: la copia non sovrascrive da sola e
+// fallirebbe, facendo finire al cliente il file temporaneo col nome UUID.
+export async function copiaConNome(
+  uri: string,
+  cartella: string,
+  nomeFile: string
+): Promise<string> {
+  const dest = cartella + nomeFile;
+  await FileSystem.deleteAsync(dest, { idempotent: true });
+  await FileSystem.copyAsync({ from: uri, to: dest });
+  return dest;
+}
+
+// Genera il PDF e lo scrive in cache con un nome leggibile
+// (preventivo-2026-004.pdf), così le app che lo ricevono mostrano quel nome.
+//
+// Perché non copiamo il file creato da expo-print: expo-print lo salva nella
+// SUA cartella temporanea (cache/Print/<uuid>.pdf). In Expo Go quella cartella
+// sta fuori dallo spazio a cui la nostra app ha accesso, quindi copyAsync
+// fallisce con "isn't readable". Chiediamo invece a expo-print anche il
+// contenuto in base64 e scriviamo noi il file nella nostra cache: funziona
+// sia in Expo Go sia nell'app installata.
+async function creaFilePdf(html: string, nomeFile: string): Promise<string> {
+  const { uri, base64 } = await Print.printToFileAsync({
+    html,
+    ...A4,
+    base64: true,
+  });
+
+  if (!base64 || !FileSystem.cacheDirectory) {
+    console.warn('PDF senza contenuto base64, uso il file temporaneo');
+    return uri;
+  }
+
   try {
-    const filename = `preventivo-${idPreventivo}.pdf`;
-    const dest = FileSystem.cacheDirectory + filename;
-    await FileSystem.copyAsync({ from: uri, to: dest });
+    const dest = FileSystem.cacheDirectory + nomeFile;
+    // writeAsStringAsync sovrascrive un eventuale file con lo stesso nome
+    await FileSystem.writeAsStringAsync(dest, base64, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
     return dest;
-  } catch (copyErr) {
-    // Try to return a content URI on Android if copy fails
+  } catch (scritturaErr) {
     console.warn(
-      'Impossibile copiare il PDF in cache, provo a ottenere content URI',
-      copyErr
+      'Impossibile scrivere il PDF in cache, uso il file temporaneo',
+      scritturaErr
     );
-    try {
-      if (Platform.OS === 'android' && FileSystem.getContentUriAsync) {
-        const contentUri = await FileSystem.getContentUriAsync(uri);
-        return contentUri;
-      }
-    } catch (contentErr) {
-      console.warn(
-        'Impossibile ottenere content URI, uso il percorso originale',
-        contentErr
-      );
-    }
     return uri;
   }
 }

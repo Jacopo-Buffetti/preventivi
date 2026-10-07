@@ -4,6 +4,12 @@ export function formattaNumeroPreventivo(anno: number, numero: number): string {
   return `${anno}/${String(numero).padStart(3, '0')}`;
 }
 
+// Nome del file PDF, senza la "/" che non è ammessa nei nomi dei file.
+// Esempio: preventivo-2026-005.pdf
+export function nomeFilePreventivo(anno: number, numero: number): string {
+  return `preventivo-${anno}-${String(numero).padStart(3, '0')}.pdf`;
+}
+
 export function formattaData(data: string | Date): string {
   return new Date(data).toLocaleDateString('it-IT', {
     day: '2-digit',

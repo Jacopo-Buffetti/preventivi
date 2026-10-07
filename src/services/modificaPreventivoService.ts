@@ -1,4 +1,5 @@
 import { getDbConnection } from './db';
+import { nuovoId } from './id';
 import type { PreventivoInput } from './databaseService';
 
 // Aggiorna un preventivo esistente con le sue voci.
@@ -42,7 +43,7 @@ export async function updatePreventivoWithVoci(
     await db.runAsync('DELETE FROM voci_preventivo WHERE preventivo_id = ?;', [idPreventivo]);
 
     for (const voce of vociCalcolate) {
-      const voceId = `VOCE-${Math.random().toString(36).substring(2, 9)}`;
+      const voceId = nuovoId();
       await db.runAsync(
         `INSERT INTO voci_preventivo (id, preventivo_id, descrizione, quantita, prezzo_unitario, totale_voce)
          VALUES (?, ?, ?, ?, ?, ?);`,

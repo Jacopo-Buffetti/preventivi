@@ -45,6 +45,7 @@ export interface Preventivo {
   id: string;
   cliente_id: string;
   cliente_nome?: string;
+  cliente_telefono?: string; // per ricontattare il cliente dalla Home
   numero_preventivo: number | null; // null = bozza, numero non ancora assegnato
   anno: number;
   data_creazione: string;
@@ -307,7 +308,7 @@ export async function getPreventiviByClienteId(
 export async function getAllPreventivi(): Promise<Preventivo[]> {
   const db = await getDbConnection();
   return await db.getAllAsync<Preventivo>(`
-    SELECT p.*, c.nome as cliente_nome 
+    SELECT p.*, c.nome as cliente_nome, c.telefono as cliente_telefono
     FROM preventivi p
     JOIN clienti c ON p.cliente_id = c.id
     WHERE p.deleted_at IS NULL

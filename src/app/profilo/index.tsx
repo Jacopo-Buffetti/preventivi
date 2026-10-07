@@ -1,16 +1,23 @@
-import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import { useEffect, useState, type ReactNode } from 'react';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ProfiloForm } from '../../components/profilo/ProfiloForm';
-import { useTema } from '../../constants/tema';
+import { FONT, useSceltaTema, useTema, type Tema } from '../../constants/tema';
 import { supabase } from '../../services/supabase';
 import { sincronizzaOra, useStatoSync } from '../../services/syncAutomatico';
 import { avviso, conferma } from '../../utils/dialoghi';
 
 export default function ProfiloScreen() {
-  const router = useRouter();
   const t = useTema();
+  const { nome: nomeTema, alterna } = useSceltaTema();
   const insets = useSafeAreaInsets();
   const [emailUtente, setEmailUtente] = useState<string | null>(null);
   const statoSync = useStatoSync();
@@ -23,20 +30,24 @@ export default function ProfiloScreen() {
       .catch(console.error);
   }, []);
 
-  // Testo dell'indicatore di sincronizzazione
-  const descrizioneSync = statoSync.inCorso
-    ? 'Sincronizzazione in corso…'
+  // Stato della sincronizzazione: testo e colore del pallino
+  const orario = statoSync.ultimaRiuscita?.toLocaleTimeString('it-IT', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  const sync = statoSync.inCorso
+    ? { testo: 'Sincronizzazione in corso…', colore: t.bottonePrimario }
     : statoSync.errore
-      ? `Non sincronizzato: ${statoSync.errore}. Le modifiche partiranno appena possibile.`
-      : statoSync.ultimaRiuscita
-        ? `Sincronizzato alle ${statoSync.ultimaRiuscita.toLocaleTimeString(
-            'it-IT',
-            {
-              hour: '2-digit',
-              minute: '2-digit',
-            }
-          )}`
-        : 'In attesa della prima sincronizzazione…';
+      ? {
+          testo: `Non sincronizzato: ${statoSync.errore}. Le modifiche partiranno appena possibile.`,
+          colore: t.pericolo,
+        }
+      : orario
+        ? { testo: `Tutto sincronizzato alle ${orario}`, colore: '#3FB97A' }
+        : {
+            testo: 'In attesa della prima sincronizzazione…',
+            colore: t.bottonePrimario,
+          };
 
   // Dopo il logout non serve navigare: _layout.tsx riceve l'evento da
   // Supabase e mostra la schermata di login al posto dell'app.
@@ -56,104 +67,246 @@ export default function ProfiloScreen() {
     }
   };
 
-  const tornaIndietro = () => {
-    if (router.canGoBack()) router.back();
-    else router.replace('/');
-  };
-
   return (
-    <View style={[styles.container, { backgroundColor: t.sfondo }]}>
-      <View style={[styles.barra, { paddingTop: insets.top + 12 }]}>
-        <Pressable
-          onPress={tornaIndietro}
-          hitSlop={12}
-          accessibilityRole="button"
+    <ScrollView
+      style={{ backgroundColor: t.sfondo }}
+      contentContainerStyle={[
+        styles.contenuto,
+        { paddingTop: insets.top + 20 },
+      ]}
+      keyboardShouldPersistTaps="handled"
+      automaticallyAdjustKeyboardInsets
+    >
+      <View style={{ gap: 2 }}>
+        <Text
+          style={[styles.titolo, { color: t.testo }]}
+          accessibilityRole="header"
         >
-          <Text style={[styles.indietro, { color: t.testoSecondario }]}>
-            ‹ Home
-          </Text>
-        </Pressable>
-        <Text style={[styles.title, { color: t.testo }]}>Profilo Officina</Text>
-        <Text style={[styles.sottotitolo, { color: t.testoSecondario }]}>
-          Questi dati compaiono sui preventivi e sul biglietto da visita.
+          Profilo
         </Text>
+        <Text style={[styles.sottotitolo, { color: t.testoSecondario }]}>
+          Account, aspetto dell'app e dati dell'officina.
+        </Text>
+      </View>
 
+      {/* --- ACCOUNT E SINCRONIZZAZIONE --- */}
+      <Sezione t={t} titolo="Account">
         <View
           style={[
-            styles.account,
-            { borderColor: t.bordo, backgroundColor: t.card },
+            styles.card,
+            { backgroundColor: t.card, borderColor: t.bordo },
           ]}
         >
-          <Text
-            style={[styles.accountTesto, { color: t.testoSecondario }]}
-            numberOfLines={1}
-          >
-            Collegato come{' '}
-            <Text style={{ color: t.testo, fontWeight: '700' }}>
-              {emailUtente ?? '…'}
+          <View style={styles.rigaAccount}>
+            <View
+              style={[styles.iconaRiquadro, { backgroundColor: t.riquadro }]}
+            >
+              <Feather name="user" size={20} color={t.testo} />
+            </View>
+            <View style={styles.testi}>
+              <Text style={[styles.etichetta, { color: t.testoSecondario }]}>
+                Collegato come
+              </Text>
+              <Text
+                style={[styles.valore, { color: t.testo }]}
+                numberOfLines={1}
+              >
+                {emailUtente ?? '…'}
+              </Text>
+            </View>
+          </View>
+
+          <View style={[styles.rigaSync, { borderTopColor: t.bordo }]}>
+            <View style={[styles.pallino, { backgroundColor: sync.colore }]} />
+            <Text
+              style={[
+                styles.testoSync,
+                { color: statoSync.errore ? t.pericolo : t.testoSecondario },
+              ]}
+            >
+              {sync.testo}
             </Text>
-          </Text>
-          <View style={styles.azioniAccount}>
+          </View>
+
+          <View style={[styles.azioni, { borderTopColor: t.bordo }]}>
             <Pressable
               onPress={sincronizzaOra}
               disabled={statoSync.inCorso}
-              hitSlop={12}
               accessibilityRole="button"
+              style={({ pressed }) => [
+                styles.azione,
+                { backgroundColor: t.riquadro },
+                statoSync.inCorso && styles.disabilitato,
+                pressed && styles.premuto,
+              ]}
             >
-              <Text
-                style={[
-                  styles.esci,
-                  { color: t.accento, opacity: statoSync.inCorso ? 0.5 : 1 },
-                ]}
-              >
-                Sincronizza
+              <Feather name="refresh-cw" size={17} color={t.testo} />
+              <Text style={[styles.azioneTesto, { color: t.testo }]}>
+                Sincronizza ora
               </Text>
             </Pressable>
-            <Pressable onPress={esci} hitSlop={12} accessibilityRole="button">
-              <Text style={[styles.esci, { color: t.pericolo }]}>Esci</Text>
+            <Pressable
+              onPress={esci}
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                styles.azione,
+                { backgroundColor: t.riquadro },
+                pressed && styles.premuto,
+              ]}
+            >
+              <Feather name="log-out" size={17} color={t.pericolo} />
+              <Text style={[styles.azioneTesto, { color: t.pericolo }]}>
+                Esci
+              </Text>
             </Pressable>
           </View>
         </View>
+      </Sezione>
 
-        <Text
+      {/* --- ASPETTO: lo stesso interruttore della luna/sole in Home --- */}
+      <Sezione t={t} titolo="Aspetto">
+        <View
           style={[
-            styles.statoSync,
-            { color: statoSync.errore ? t.pericolo : t.testoSecondario },
+            styles.card,
+            styles.rigaTema,
+            { backgroundColor: t.card, borderColor: t.bordo },
           ]}
         >
-          {descrizioneSync}
+          <View style={[styles.iconaRiquadro, { backgroundColor: t.riquadro }]}>
+            <Feather
+              name={nomeTema === 'dark' ? 'moon' : 'sun'}
+              size={20}
+              color={t.accento}
+            />
+          </View>
+          <View style={styles.testi}>
+            <Text style={[styles.valore, { color: t.testo }]}>Tema scuro</Text>
+            <Text style={[styles.etichetta, { color: t.testoSecondario }]}>
+              La scelta resta salvata su questo dispositivo.
+            </Text>
+          </View>
+          <Switch
+            value={nomeTema === 'dark'}
+            onValueChange={alterna}
+            trackColor={{ false: t.bordo, true: t.bottonePrimario }}
+            thumbColor="#FFFFFF"
+            ios_backgroundColor={t.bordo}
+            accessibilityLabel="Tema scuro"
+          />
+        </View>
+      </Sezione>
+
+      {/* --- DATI DELL'OFFICINA --- */}
+      <Sezione
+        t={t}
+        titolo="Dati dell'officina"
+        sottotitolo="Compaiono sui preventivi e completano il biglietto da visita."
+      >
+        <ProfiloForm />
+      </Sezione>
+    </ScrollView>
+  );
+}
+
+function Sezione({
+  t,
+  titolo,
+  sottotitolo,
+  children,
+}: {
+  t: Tema;
+  titolo: string;
+  sottotitolo?: string;
+  children: ReactNode;
+}) {
+  return (
+    <View style={styles.sezione}>
+      <View style={{ gap: 2 }}>
+        <Text
+          style={[styles.titoloSezione, { color: t.testo }]}
+          accessibilityRole="header"
+        >
+          {titolo}
         </Text>
+        {!!sottotitolo && (
+          <Text style={[styles.etichetta, { color: t.testoSecondario }]}>
+            {sottotitolo}
+          </Text>
+        )}
       </View>
-      <ProfiloForm />
+      {children}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  barra: {
-    paddingHorizontal: 16,
-    paddingBottom: 8,
+  contenuto: {
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+    gap: 24,
     width: '100%',
     maxWidth: 720,
     alignSelf: 'center',
   },
-  indietro: { fontSize: 15, fontWeight: '600', marginBottom: 12 },
-  title: { fontSize: 24, fontWeight: '800', letterSpacing: -0.3 },
-  sottotitolo: { fontSize: 14, marginTop: 4 },
-  account: {
+  titolo: {
+    fontSize: 30,
+    lineHeight: 36,
+    fontFamily: FONT.pieno,
+    letterSpacing: -0.5,
+  },
+  sottotitolo: { fontSize: 13, fontFamily: FONT.regolare },
+
+  sezione: { gap: 10 },
+  titoloSezione: { fontSize: 16, fontFamily: FONT.pieno },
+
+  card: { borderRadius: 18, borderWidth: 1, overflow: 'hidden' },
+  rigaAccount: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     gap: 12,
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginTop: 12,
+    padding: 14,
   },
-  accountTesto: { fontSize: 13, flexShrink: 1 },
-  statoSync: { fontSize: 12, marginTop: 6, marginLeft: 2 },
-  azioniAccount: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  esci: { fontSize: 14, fontWeight: '800' },
+  iconaRiquadro: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  testi: { flex: 1, minWidth: 0, gap: 2 },
+  etichetta: { fontSize: 13, fontFamily: FONT.regolare },
+  valore: { fontSize: 15, fontFamily: FONT.grassetto },
+
+  rigaSync: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+  },
+  pallino: { width: 8, height: 8, borderRadius: 4 },
+  testoSync: { flex: 1, fontSize: 13, lineHeight: 18, fontFamily: FONT.medio },
+
+  azioni: { flexDirection: 'row', gap: 8, padding: 12, borderTopWidth: 1 },
+  azione: {
+    flex: 1,
+    height: 44,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  azioneTesto: { fontSize: 14, fontFamily: FONT.grassetto },
+
+  rigaTema: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+  },
+
+  disabilitato: { opacity: 0.5 },
+  premuto: { opacity: 0.85, transform: [{ scale: 0.98 }] },
 });

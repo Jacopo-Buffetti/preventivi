@@ -193,7 +193,7 @@ async function creaFilePdf(html: string, nomeFile: string): Promise<string> {
 
 // Sul web si stampa da un iframe nascosto: così si stampa solo il preventivo
 // e non la schermata dell'app, e il browser non blocca una finestra popup.
-function stampaSulWeb(html: string) {
+export function stampaSulWeb(html: string) {
   const iframe = document.createElement('iframe');
   iframe.style.position = 'fixed';
   iframe.style.width = '0';

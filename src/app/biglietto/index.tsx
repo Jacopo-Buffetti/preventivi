@@ -1,7 +1,14 @@
+import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { useEffect, useState } from 'react';
+import {
+  useEffect,
+  useState,
+  type ComponentProps,
+  type ReactNode,
+} from 'react';
 import {
   ActivityIndicator,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,7 +19,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AnteprimaBiglietto } from '../../components/biglietto/AnteprimaBiglietto';
 import { FormInput } from '../../components/ui/FormInput';
-import { useTema, type Tema } from '../../constants/tema';
+import { FONT, useSceltaTema, useTema, type Tema } from '../../constants/tema';
 import {
   CONDIVISIONE_IN_CORSO,
   condividiPdfBiglietto,
@@ -32,9 +39,10 @@ const MAX_LOGO_BASE64 = 2_800_000;
 
 export default function BigliettoScreen() {
   const t = useTema();
+  const { nome: nomeTema } = useSceltaTema();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const larghezzaAnteprima = Math.min(width - 32, 420);
+  const larghezzaAnteprima = Math.min(width - 40, 420);
 
   const [dati, setDati] = useState<Biglietto>({});
   const [lato, setLato] = useState<'fronte' | 'retro'>('fronte');
@@ -177,309 +185,369 @@ export default function BigliettoScreen() {
   if (caricamento) {
     return (
       <View style={[styles.centro, { backgroundColor: t.sfondo }]}>
-        <ActivityIndicator color={t.accento} size="large" />
+        <ActivityIndicator color={t.ottone} size="large" />
       </View>
     );
   }
 
+  const occupato = salvando || esportando || condividendoContatto;
+
   return (
-    <ScrollView
-      style={{ backgroundColor: t.sfondo }}
-      contentContainerStyle={[
-        styles.contenuto,
-        { paddingTop: insets.top + 24 },
-      ]}
-      keyboardShouldPersistTaps="handled"
-      automaticallyAdjustKeyboardInsets
-    >
-      <Text style={[styles.titolo, { color: t.testo }]}>
-        Biglietto da visita
-      </Text>
-      <Text style={[styles.sottotitolo, { color: t.testoSecondario }]}>
-        Componi il tuo biglietto: l'anteprima si aggiorna mentre scrivi.
-      </Text>
-
-      {/* Anteprima con scelta del lato */}
-      <View
-        style={[
-          styles.selettore,
-          { backgroundColor: t.card, borderColor: t.bordo },
+    <View style={[styles.container, { backgroundColor: t.sfondo }]}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.contenuto,
+          { paddingTop: insets.top + 20 },
         ]}
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
       >
-        {(['fronte', 'retro'] as const).map((l) => (
-          <Pressable
-            key={l}
-            onPress={() => setLato(l)}
-            style={[
-              styles.selettoreVoce,
-              lato === l && { backgroundColor: t.bottonePrimario },
-            ]}
-            accessibilityRole="button"
-            accessibilityState={{ selected: lato === l }}
-          >
+        {/* --- TITOLO E SALVATAGGIO --- */}
+        <View style={styles.testa}>
+          <View style={styles.testaTesti}>
             <Text
-              style={[
-                styles.selettoreTesto,
-                { color: lato === l ? '#FFFFFF' : t.testoSecondario },
-              ]}
+              style={[styles.titolo, { color: t.testo }]}
+              accessibilityRole="header"
             >
-              {l === 'fronte' ? 'Fronte' : 'Retro'}
+              Biglietto da visita
             </Text>
-          </Pressable>
-        ))}
-      </View>
-
-      <Pressable
-        onPress={() => setLato(lato === 'fronte' ? 'retro' : 'fronte')}
-        style={styles.anteprima}
-        accessibilityLabel="Gira il biglietto"
-      >
-        <AnteprimaBiglietto
-          dati={dati}
-          lato={lato}
-          larghezza={larghezzaAnteprima}
-        />
-        <Text style={[styles.suggerimento, { color: t.testoSecondario }]}>
-          Tocca il biglietto per girarlo
-        </Text>
-      </Pressable>
-
-      {/* Logo */}
-      <Sezione titolo="LOGO" t={t} />
-      <View
-        style={[styles.card, { backgroundColor: t.card, borderColor: t.bordo }]}
-      >
-        <Text style={[styles.testoCard, { color: t.testoSecondario }]}>
-          Il logo compare grande sul fronte e piccolo sul retro. Funziona meglio
-          con un'immagine quadrata su sfondo bianco o trasparente.
-        </Text>
-        <View style={styles.rigaBottoni}>
+            <Text style={[styles.sottotitolo, { color: t.testoSecondario }]}>
+              L'anteprima si aggiorna mentre scrivi.
+            </Text>
+          </View>
+          {/* Con modifiche da salvare il pulsante è ottone, altrimenti dice "Salvato" */}
           <Pressable
-            onPress={scegliLogo}
+            onPress={salva}
+            disabled={!modificato || salvando}
+            accessibilityRole="button"
+            accessibilityLabel={
+              modificato ? 'Salva modifiche' : 'Biglietto salvato'
+            }
             style={({ pressed }) => [
-              styles.bottoneLogo,
-              { backgroundColor: t.bottoneSecondario },
+              styles.salva,
+              modificato
+                ? { backgroundColor: t.bottonePrimario }
+                : { backgroundColor: t.riquadro },
               pressed && styles.premuto,
             ]}
-            accessibilityRole="button"
           >
-            <Text style={[styles.bottoneLogoTesto, { color: t.testo }]}>
-              🖼️ {dati.logo ? 'Cambia logo' : 'Carica logo'}
-            </Text>
+            {salvando ? (
+              <ActivityIndicator color={t.testoSuPrimario} />
+            ) : (
+              <>
+                <Feather
+                  name={modificato ? 'save' : 'check'}
+                  size={16}
+                  color={modificato ? t.testoSuPrimario : t.testoSecondario}
+                />
+                <Text
+                  style={[
+                    styles.salvaTesto,
+                    {
+                      color: modificato ? t.testoSuPrimario : t.testoSecondario,
+                    },
+                  ]}
+                >
+                  {modificato ? 'Salva' : 'Salvato'}
+                </Text>
+              </>
+            )}
           </Pressable>
-          {!!dati.logo && (
-            <Pressable
-              onPress={rimuoviLogo}
-              style={({ pressed }) => [
-                styles.bottoneLogo,
-                styles.bottoneRimuovi,
-                { borderColor: t.pericolo },
-                pressed && styles.premuto,
-              ]}
-              accessibilityRole="button"
-            >
-              <Text style={[styles.bottoneLogoTesto, { color: t.pericolo }]}>
-                Rimuovi
-              </Text>
-            </Pressable>
-          )}
         </View>
-      </View>
 
-      {/* Fronte */}
-      <Sezione titolo="FRONTE" t={t} />
-      <FormInput
-        label="Descrizione attività"
-        placeholder="es. Serrature · Cancelli · Inferriate"
-        value={dati.descrizione_fronte ?? ''}
-        onChangeText={aggiorna('descrizione_fronte')}
-        onFocus={() => setLato('fronte')}
-      />
+        {/* --- ANTEPRIMA --- */}
+        <View style={[styles.selettore, { backgroundColor: t.riquadro }]}>
+          {(['fronte', 'retro'] as const).map((l) => {
+            const attivo = lato === l;
+            return (
+              <Pressable
+                key={l}
+                onPress={() => setLato(l)}
+                style={[
+                  styles.selettoreVoce,
+                  attivo && {
+                    backgroundColor: nomeTema === 'dark' ? t.bordo : t.card,
+                  },
+                ]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: attivo }}
+              >
+                <Text
+                  style={[
+                    styles.selettoreTesto,
+                    {
+                      color: attivo ? t.testo : t.testoSecondario,
+                      fontFamily: attivo ? FONT.pieno : FONT.semi,
+                    },
+                  ]}
+                >
+                  {l === 'fronte' ? 'Fronte' : 'Retro'}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
 
-      {/* Retro */}
-      <View style={styles.intestazioneRetro}>
-        <Sezione titolo="RETRO" t={t} />
         <Pressable
-          onPress={copiaDalProfilo}
-          hitSlop={8}
-          accessibilityRole="button"
+          onPress={() => setLato(lato === 'fronte' ? 'retro' : 'fronte')}
+          style={styles.anteprima}
+          accessibilityLabel="Gira il biglietto"
         >
-          <Text style={[styles.link, { color: t.accento }]}>
-            Completa dal profilo
+          <View style={styles.ombra}>
+            <AnteprimaBiglietto
+              dati={dati}
+              lato={lato}
+              larghezza={larghezzaAnteprima}
+            />
+          </View>
+          <View style={styles.suggerimento}>
+            <Feather name="refresh-cw" size={13} color={t.testoSecondario} />
+            <Text
+              style={[styles.suggerimentoTesto, { color: t.testoSecondario }]}
+            >
+              Tocca il biglietto per girarlo
+            </Text>
+          </View>
+        </Pressable>
+
+        {/* --- LOGO --- */}
+        <Sezione t={t} titolo="Logo">
+          <View
+            style={[
+              styles.card,
+              styles.cardLogo,
+              { backgroundColor: t.card, borderColor: t.bordo },
+            ]}
+          >
+            <View
+              style={[
+                styles.miniatura,
+                { backgroundColor: '#FFFFFF', borderColor: t.bordo },
+              ]}
+            >
+              {dati.logo ? (
+                <Image
+                  source={{ uri: dati.logo }}
+                  style={styles.miniaturaImmagine}
+                  resizeMode="contain"
+                  accessibilityLabel="Logo attuale"
+                />
+              ) : (
+                <Feather name="image" size={24} color="#93A3B5" />
+              )}
+            </View>
+            <View style={styles.logoTesti}>
+              <Text style={[styles.testoCard, { color: t.testoSecondario }]}>
+                Grande sul fronte, piccolo sul retro. Meglio un'immagine
+                quadrata su fondo bianco o trasparente.
+              </Text>
+              <View style={styles.rigaBottoni}>
+                <PulsanteRiquadro
+                  t={t}
+                  icona="image"
+                  testo={dati.logo ? 'Cambia' : 'Carica logo'}
+                  onPress={scegliLogo}
+                />
+                {!!dati.logo && (
+                  <PulsanteRiquadro
+                    t={t}
+                    icona="trash-2"
+                    testo="Rimuovi"
+                    colore={t.pericolo}
+                    onPress={rimuoviLogo}
+                  />
+                )}
+              </View>
+            </View>
+          </View>
+        </Sezione>
+
+        {/* --- FRONTE --- */}
+        <Sezione t={t} titolo="Fronte">
+          <FormInput
+            label="Descrizione attività"
+            placeholder="es. Serrature, cancelli, inferriate"
+            value={dati.descrizione_fronte ?? ''}
+            onChangeText={aggiorna('descrizione_fronte')}
+            onFocus={() => setLato('fronte')}
+            aiuto="Compare sotto il logo, in maiuscolo."
+          />
+        </Sezione>
+
+        {/* --- RETRO --- */}
+        <Sezione
+          t={t}
+          titolo="Retro"
+          azione={{
+            etichetta: 'Completa dal profilo',
+            onPress: copiaDalProfilo,
+          }}
+        >
+          <Text style={[styles.obbligatori, { color: t.testoSecondario }]}>
+            I campi con * sono obbligatori.
           </Text>
+          <FormInput
+            label="Nome attività *"
+            placeholder="es. Giacomo D'Ignazio"
+            value={dati.nome ?? ''}
+            onChangeText={aggiorna('nome')}
+            onFocus={() => setLato('retro')}
+          />
+          <FormInput
+            label="Qualifica"
+            placeholder="es. Titolare, Fabbro, Tecnico"
+            value={dati.qualifica ?? ''}
+            onChangeText={aggiorna('qualifica')}
+            aiuto="Non compare sul biglietto: va solo nel contatto condiviso."
+          />
+          <FormInput
+            label="Descrizione retro"
+            placeholder="es. Fabbro, sicurezza su misura"
+            value={dati.descrizione_retro ?? ''}
+            onChangeText={aggiorna('descrizione_retro')}
+            onFocus={() => setLato('retro')}
+          />
+          <FormInput
+            label="Indirizzo *"
+            placeholder="es. Via Roma 12, Terni"
+            value={dati.indirizzo ?? ''}
+            onChangeText={aggiorna('indirizzo')}
+            onFocus={() => setLato('retro')}
+          />
+          <View style={styles.affiancati}>
+            <View style={styles.flex}>
+              <FormInput
+                label="Telefono *"
+                placeholder="0744 123456"
+                keyboardType="phone-pad"
+                value={dati.telefono ?? ''}
+                onChangeText={aggiorna('telefono')}
+                onFocus={() => setLato('retro')}
+              />
+            </View>
+            <View style={styles.flex}>
+              <FormInput
+                label="Cellulare"
+                placeholder="333 1234567"
+                keyboardType="phone-pad"
+                value={dati.cellulare ?? ''}
+                onChangeText={aggiorna('cellulare')}
+                onFocus={() => setLato('retro')}
+              />
+            </View>
+          </View>
+          <FormInput
+            label="Email *"
+            placeholder="info@officina.it"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            value={dati.email ?? ''}
+            onChangeText={aggiorna('email')}
+            onFocus={() => setLato('retro')}
+          />
+          <FormInput
+            label="Email secondaria"
+            placeholder="pec@officina.it"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            value={dati.email_secondaria ?? ''}
+            onChangeText={aggiorna('email_secondaria')}
+            onFocus={() => setLato('retro')}
+          />
+          <View style={styles.affiancati}>
+            <View style={styles.flex}>
+              <FormInput
+                label="P.IVA"
+                placeholder="01234567890"
+                keyboardType="numeric"
+                value={dati.p_iva ?? ''}
+                onChangeText={aggiorna('p_iva')}
+                onFocus={() => setLato('retro')}
+              />
+            </View>
+            <View style={styles.flex}>
+              <FormInput
+                label="REA"
+                placeholder="TR-123456"
+                autoCapitalize="characters"
+                value={dati.rea ?? ''}
+                onChangeText={aggiorna('rea')}
+                onFocus={() => setLato('retro')}
+              />
+            </View>
+          </View>
+          <FormInput
+            label="Codice fiscale"
+            placeholder="RSSMRA80A01L117X"
+            autoCapitalize="characters"
+            value={dati.codice_fiscale ?? ''}
+            onChangeText={aggiorna('codice_fiscale')}
+            onFocus={() => setLato('retro')}
+          />
+        </Sezione>
+      </ScrollView>
+
+      {/* --- BARRA IN BASSO: le due cose che si fanno con il biglietto --- */}
+      <View
+        style={[
+          styles.barraAzioni,
+          { backgroundColor: t.barraTab, borderTopColor: t.bordo },
+        ]}
+      >
+        <Pressable
+          onPress={esporta}
+          disabled={occupato}
+          accessibilityRole="button"
+          style={({ pressed }) => [
+            styles.azionePrincipale,
+            { backgroundColor: t.bottonePrimario },
+            occupato && styles.disabilitato,
+            pressed && styles.premuto,
+          ]}
+        >
+          {esportando ? (
+            <ActivityIndicator color={t.testoSuPrimario} />
+          ) : (
+            <>
+              <Feather name="printer" size={19} color={t.testoSuPrimario} />
+              <Text
+                style={[
+                  styles.azionePrincipaleTesto,
+                  { color: t.testoSuPrimario },
+                ]}
+              >
+                PDF per la tipografia
+              </Text>
+            </>
+          )}
+        </Pressable>
+        <Pressable
+          onPress={inviaContatto}
+          disabled={occupato}
+          accessibilityRole="button"
+          accessibilityLabel="Condividi il contatto"
+          style={({ pressed }) => [
+            styles.azioneSecondaria,
+            { borderColor: t.bordo },
+            occupato && styles.disabilitato,
+            pressed && styles.premuto,
+          ]}
+        >
+          {condividendoContatto ? (
+            <ActivityIndicator color={t.testo} />
+          ) : (
+            <>
+              <Feather name="user" size={18} color={t.testo} />
+              <Text style={[styles.azioneSecondariaTesto, { color: t.testo }]}>
+                Contatto
+              </Text>
+            </>
+          )}
         </Pressable>
       </View>
-
-      <FormInput
-        label="Nome attività *"
-        placeholder="es. Giacomo D'Ignazio"
-        value={dati.nome ?? ''}
-        onChangeText={aggiorna('nome')}
-        onFocus={() => setLato('retro')}
-      />
-      <FormInput
-        label="Qualifica"
-        placeholder="es. Titolare, Fabbro, Tecnico"
-        value={dati.qualifica ?? ''}
-        onChangeText={aggiorna('qualifica')}
-      />
-      <Text style={[styles.notaCampo, { color: t.testoSecondario }]}>
-        La qualifica non compare sul biglietto: viene inserita solo nel contatto
-        condiviso.
-      </Text>
-      <FormInput
-        label="Descrizione retro"
-        placeholder="es. Fabbro · Sicurezza su misura"
-        value={dati.descrizione_retro ?? ''}
-        onChangeText={aggiorna('descrizione_retro')}
-        onFocus={() => setLato('retro')}
-      />
-      <FormInput
-        label="Indirizzo *"
-        placeholder="es. Via Roma 12, Terni"
-        value={dati.indirizzo ?? ''}
-        onChangeText={aggiorna('indirizzo')}
-        onFocus={() => setLato('retro')}
-      />
-
-      <View style={styles.riga}>
-        <View style={styles.flex}>
-          <FormInput
-            label="Telefono *"
-            placeholder="0744 123456"
-            keyboardType="phone-pad"
-            value={dati.telefono ?? ''}
-            onChangeText={aggiorna('telefono')}
-            onFocus={() => setLato('retro')}
-          />
-        </View>
-        <View style={styles.flex}>
-          <FormInput
-            label="Cellulare"
-            placeholder="333 1234567"
-            keyboardType="phone-pad"
-            value={dati.cellulare ?? ''}
-            onChangeText={aggiorna('cellulare')}
-            onFocus={() => setLato('retro')}
-          />
-        </View>
-      </View>
-
-      <FormInput
-        label="Email *"
-        placeholder="info@officina.it"
-        keyboardType="email-address"
-        autoCapitalize="none"
-        value={dati.email ?? ''}
-        onChangeText={aggiorna('email')}
-        onFocus={() => setLato('retro')}
-      />
-      <FormInput
-        label="Email secondaria"
-        placeholder="pec@officina.it"
-        keyboardType="email-address"
-        autoCapitalize="none"
-        value={dati.email_secondaria ?? ''}
-        onChangeText={aggiorna('email_secondaria')}
-        onFocus={() => setLato('retro')}
-      />
-
-      <View style={styles.riga}>
-        <View style={styles.flex}>
-          <FormInput
-            label="P.IVA"
-            placeholder="01234567890"
-            keyboardType="numeric"
-            value={dati.p_iva ?? ''}
-            onChangeText={aggiorna('p_iva')}
-            onFocus={() => setLato('retro')}
-          />
-        </View>
-        <View style={styles.flex}>
-          <FormInput
-            label="REA"
-            placeholder="TR-123456"
-            autoCapitalize="characters"
-            value={dati.rea ?? ''}
-            onChangeText={aggiorna('rea')}
-            onFocus={() => setLato('retro')}
-          />
-        </View>
-      </View>
-      <FormInput
-        label="Codice fiscale"
-        placeholder="RSSMRA80A01L117X"
-        autoCapitalize="characters"
-        value={dati.codice_fiscale ?? ''}
-        onChangeText={aggiorna('codice_fiscale')}
-        onFocus={() => setLato('retro')}
-      />
-
-      <Text style={[styles.nota, { color: t.testoSecondario }]}>
-        * campi obbligatori
-      </Text>
-
-      {/* Azioni */}
-      <Pressable
-        onPress={esporta}
-        disabled={esportando || salvando}
-        style={({ pressed }) => [
-          styles.bottonePrimario,
-          { backgroundColor: t.bottonePrimario },
-          (esportando || salvando) && styles.disabilitato,
-          pressed && styles.premuto,
-        ]}
-        accessibilityRole="button"
-      >
-        {esportando ? (
-          <ActivityIndicator color="#FFFFFF" />
-        ) : (
-          <Text style={styles.bottonePrimarioTesto}>
-            📄 Condividi PDF per la stampa
-          </Text>
-        )}
-      </Pressable>
-
-      <Pressable
-        onPress={inviaContatto}
-        disabled={condividendoContatto || salvando}
-        style={({ pressed }) => [
-          styles.bottoneContatto,
-          { backgroundColor: t.card, borderColor: t.accento },
-          (condividendoContatto || salvando) && styles.disabilitato,
-          pressed && styles.premuto,
-        ]}
-        accessibilityRole="button"
-      >
-        {condividendoContatto ? (
-          <ActivityIndicator color={t.accento} />
-        ) : (
-          <Text style={[styles.bottoneContattoTesto, { color: t.accento }]}>
-            👤 Condividi contatto
-          </Text>
-        )}
-      </Pressable>
-
-      <Pressable
-        onPress={salva}
-        disabled={!modificato || salvando}
-        style={({ pressed }) => [
-          styles.bottoneSecondario,
-          { borderColor: t.bordo },
-          (!modificato || salvando) && styles.disabilitato,
-          pressed && styles.premuto,
-        ]}
-        accessibilityRole="button"
-      >
-        <Text style={[styles.bottoneSecondarioTesto, { color: t.testo }]}>
-          {salvando
-            ? 'Salvataggio…'
-            : modificato
-              ? '💾 Salva modifiche'
-              : '✓ Salvato'}
-        </Text>
-      </Pressable>
-    </ScrollView>
+    </View>
   );
 }
 
@@ -513,96 +581,210 @@ async function datiDalProfilo(attuali: Biglietto): Promise<Biglietto> {
   };
 }
 
-function Sezione({ titolo, t }: { titolo: string; t: Tema }) {
+type NomeIcona = ComponentProps<typeof Feather>['name'];
+
+function Sezione({
+  t,
+  titolo,
+  azione,
+  children,
+}: {
+  t: Tema;
+  titolo: string;
+  azione?: { etichetta: string; onPress: () => void };
+  children: ReactNode;
+}) {
   return (
-    <Text style={[styles.sezione, { color: t.testoSecondario }]}>{titolo}</Text>
+    <View style={styles.sezione}>
+      <View style={styles.testaSezione}>
+        <Text
+          style={[styles.titoloSezione, { color: t.testo }]}
+          accessibilityRole="header"
+        >
+          {titolo}
+        </Text>
+        {azione && (
+          <Pressable
+            onPress={azione.onPress}
+            hitSlop={10}
+            accessibilityRole="button"
+          >
+            <Text style={[styles.linkSezione, { color: t.accento }]}>
+              {azione.etichetta}
+            </Text>
+          </Pressable>
+        )}
+      </View>
+      {children}
+    </View>
+  );
+}
+
+function PulsanteRiquadro({
+  t,
+  icona,
+  testo,
+  colore,
+  onPress,
+}: {
+  t: Tema;
+  icona: NomeIcona;
+  testo: string;
+  colore?: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      style={({ pressed }) => [
+        styles.pulsanteRiquadro,
+        { backgroundColor: t.riquadro },
+        pressed && styles.premuto,
+      ]}
+    >
+      <Feather name={icona} size={16} color={colore ?? t.testo} />
+      <Text
+        style={[styles.pulsanteRiquadroTesto, { color: colore ?? t.testo }]}
+      >
+        {testo}
+      </Text>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
+  container: { flex: 1 },
   centro: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   contenuto: {
-    paddingHorizontal: 16,
-    paddingBottom: 40,
+    paddingHorizontal: 20,
+    paddingBottom: 32,
+    gap: 24,
     width: '100%',
     maxWidth: 720,
     alignSelf: 'center',
   },
-  titolo: { fontSize: 24, fontWeight: '800', letterSpacing: -0.4 },
-  sottotitolo: { fontSize: 14, marginTop: 4 },
+
+  testa: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  testaTesti: { flex: 1, gap: 2 },
+  titolo: {
+    fontSize: 30,
+    lineHeight: 36,
+    fontFamily: FONT.pieno,
+    letterSpacing: -0.5,
+  },
+  sottotitolo: { fontSize: 13, fontFamily: FONT.regolare },
+  salva: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    height: 40,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    marginTop: 2,
+    minWidth: 96,
+    justifyContent: 'center',
+  },
+  salvaTesto: { fontSize: 14, fontFamily: FONT.grassetto },
 
   selettore: {
     flexDirection: 'row',
-    borderWidth: 1,
-    borderRadius: 999,
-    padding: 4,
-    marginTop: 20,
     alignSelf: 'center',
+    padding: 4,
+    borderRadius: 14,
+    gap: 4,
+    marginBottom: -8,
   },
   selettoreVoce: {
+    height: 36,
     paddingHorizontal: 22,
-    paddingVertical: 8,
-    borderRadius: 999,
-  },
-  selettoreTesto: { fontSize: 14, fontWeight: '700' },
-
-  anteprima: { alignItems: 'center', marginTop: 16 },
-  suggerimento: { fontSize: 12, marginTop: 10 },
-
-  sezione: {
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 0.4,
-    marginTop: 24,
-    marginBottom: 10,
-  },
-  intestazioneRetro: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-  },
-  link: { fontSize: 13, fontWeight: '700', marginBottom: 10 },
-
-  card: { borderWidth: 1, borderRadius: 12, padding: 14 },
-  testoCard: { fontSize: 13, lineHeight: 19 },
-  rigaBottoni: { flexDirection: 'row', gap: 8, marginTop: 12 },
-  bottoneLogo: {
-    flex: 1,
     borderRadius: 10,
-    paddingVertical: 12,
+    justifyContent: 'center',
+  },
+  selettoreTesto: { fontSize: 14 },
+
+  anteprima: { alignItems: 'center', gap: 10 },
+  // Ombra leggera: il biglietto deve sembrare un oggetto di carta
+  ombra: { borderRadius: 12, boxShadow: '0px 10px 24px rgba(7, 21, 34, 0.25)' },
+  suggerimento: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  suggerimentoTesto: { fontSize: 12, fontFamily: FONT.regolare },
+
+  sezione: { gap: 10 },
+  testaSezione: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  titoloSezione: { fontSize: 16, fontFamily: FONT.pieno },
+  linkSezione: { fontSize: 14, fontFamily: FONT.grassetto, paddingVertical: 4 },
+  obbligatori: {
+    fontSize: 12,
+    fontFamily: FONT.regolare,
+    marginTop: -4,
+    marginBottom: 2,
+  },
+
+  card: { borderRadius: 18, borderWidth: 1 },
+  cardLogo: {
+    flexDirection: 'row',
+    gap: 14,
+    padding: 14,
     alignItems: 'center',
   },
-  bottoneRimuovi: { flex: 0, paddingHorizontal: 18, borderWidth: 1 },
-  bottoneLogoTesto: { fontSize: 14, fontWeight: '700' },
+  miniatura: {
+    width: 72,
+    height: 72,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  miniaturaImmagine: { width: 64, height: 64 },
+  logoTesti: { flex: 1, gap: 10 },
+  testoCard: { fontSize: 13, lineHeight: 18, fontFamily: FONT.regolare },
+  rigaBottoni: { flexDirection: 'row', gap: 8 },
+  pulsanteRiquadro: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    height: 40,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+  },
+  pulsanteRiquadroTesto: { fontSize: 13, fontFamily: FONT.grassetto },
 
-  riga: { flexDirection: 'row', gap: 12 },
+  affiancati: { flexDirection: 'row', gap: 12 },
   flex: { flex: 1 },
-  nota: { fontSize: 12, marginTop: -4 },
-  notaCampo: { fontSize: 12, marginTop: -10, marginBottom: 16 },
 
-  bottonePrimario: {
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 20,
+  barraAzioni: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderTopWidth: 1,
   },
-  bottonePrimarioTesto: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
-  bottoneContatto: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingVertical: 15,
+  azionePrincipale: {
+    flex: 1,
+    height: 56,
+    borderRadius: 16,
+    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 12,
+    justifyContent: 'center',
+    gap: 8,
   },
-  bottoneContattoTesto: { fontSize: 15, fontWeight: '800' },
-  bottoneSecondario: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingVertical: 14,
+  azionePrincipaleTesto: { fontSize: 16, fontFamily: FONT.pieno },
+  azioneSecondaria: {
+    height: 56,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 12,
+    justifyContent: 'center',
+    gap: 8,
   },
-  bottoneSecondarioTesto: { fontSize: 15, fontWeight: '700' },
+  azioneSecondariaTesto: { fontSize: 14, fontFamily: FONT.grassetto },
 
   disabilitato: { opacity: 0.5 },
   premuto: { opacity: 0.85, transform: [{ scale: 0.98 }] },

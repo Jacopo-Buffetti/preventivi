@@ -1,8 +1,5 @@
 import { useEffect, useState } from 'react';
 import {
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -10,10 +7,10 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LISTINO } from '../../constants/listino';
-import { useTema } from '../../constants/tema';
+import { FONT, useTema, type Tema } from '../../constants/tema';
 import { formattaEuro, leggiNumero } from '../../utils/formato';
+import { FoglioInBasso } from '../ui/FoglioInBasso';
 
 export interface NuovaVoce {
   descrizione: string;
@@ -29,7 +26,7 @@ interface Props {
   voceDaModificare?: NuovaVoce | null;
 }
 
-// Foglio che sale dal basso per inserire una voce di costo
+// Foglio che sale dal basso per inserire o modificare una voce di costo
 export function FoglioNuovaVoce({
   visibile,
   onChiudi,
@@ -37,7 +34,6 @@ export function FoglioNuovaVoce({
   voceDaModificare,
 }: Props) {
   const t = useTema();
-  const insets = useSafeAreaInsets();
 
   const [listinoScelto, setListinoScelto] = useState<number | null>(null);
   const [descrizione, setDescrizione] = useState('');
@@ -95,54 +91,17 @@ export function FoglioNuovaVoce({
   ];
 
   return (
-    <Modal
-      visible={visibile}
-      transparent
-      animationType="slide"
-      onRequestClose={onChiudi}
+    <FoglioInBasso
+      visibile={visibile}
+      titolo={inModifica ? 'Modifica voce' : 'Aggiungi una voce'}
+      onChiudi={onChiudi}
     >
-      <KeyboardAvoidingView
-        style={styles.contenitore}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        {/* Tocco sullo sfondo scuro: chiude il foglio */}
-        <Pressable
-          style={[StyleSheet.absoluteFill, { backgroundColor: t.overlay }]}
-          onPress={onChiudi}
-          accessibilityLabel="Chiudi"
-        />
-
-        <View
-          style={[
-            styles.foglio,
-            {
-              backgroundColor: t.card,
-              borderColor: t.accento,
-              paddingBottom: insets.bottom + 20,
-            },
-          ]}
-        >
-          <View style={[styles.maniglia, { backgroundColor: t.bordo }]} />
-
-          <View style={styles.testa}>
-            <Text style={[styles.titolo, { color: t.accento }]}>
-              {inModifica ? 'Modifica Voce di Costo' : 'Aggiungi Voce di Costo'}
-            </Text>
-            <Pressable
-              onPress={onChiudi}
-              hitSlop={12}
-              accessibilityRole="button"
-              accessibilityLabel="Chiudi"
-            >
-              <Text style={[styles.chiudi, { color: t.testoSecondario }]}>
-                ✕
-              </Text>
-            </Pressable>
-          </View>
-
-          <ScrollView keyboardShouldPersistTaps="handled">
+      <ScrollView keyboardShouldPersistTaps="handled">
+        {/* Il listino serve solo per le voci nuove */}
+        {!inModifica && (
+          <>
             <Text style={[styles.etichetta, { color: t.testoSecondario }]}>
-              SELEZIONA DA LISTINO RAPIDO
+              Dal listino rapido
             </Text>
             <ScrollView
               horizontal
@@ -151,45 +110,55 @@ export function FoglioNuovaVoce({
               keyboardShouldPersistTaps="handled"
             >
               <Chip
-                testo="Voce personalizzata"
+                t={t}
+                testo="Voce libera"
                 attivo={listinoScelto === null}
                 onPress={() => scegliDaListino(null)}
               />
               {LISTINO.map((voce, i) => (
                 <Chip
                   key={voce.descrizione}
+                  t={t}
                   testo={voce.descrizione}
                   attivo={listinoScelto === i}
                   onPress={() => scegliDaListino(i)}
                 />
               ))}
             </ScrollView>
+          </>
+        )}
 
-            <Text style={[styles.etichetta, { color: t.testoSecondario }]}>
-              DESCRIZIONE LAVORAZIONE
-            </Text>
-            <TextInput
-              value={descrizione}
-              onChangeText={setDescrizione}
-              placeholder="es. Posa in opera e trasporto"
-              placeholderTextColor={t.testoSecondario}
-              style={stileInput}
-              returnKeyType="next"
-            />
+        <Text style={[styles.etichetta, { color: t.testoSecondario }]}>
+          Descrizione
+        </Text>
+        <TextInput
+          value={descrizione}
+          onChangeText={setDescrizione}
+          placeholder="es. Posa in opera e trasporto"
+          placeholderTextColor={t.testoSecondario}
+          style={stileInput}
+          returnKeyType="next"
+          accessibilityLabel="Descrizione"
+        />
 
+        {/* Quantità e prezzo affiancati: si leggono come "2 × 35 €" */}
+        <View style={styles.affiancati}>
+          <View style={styles.colonnaStretta}>
             <Text style={[styles.etichetta, { color: t.testoSecondario }]}>
-              Q.TÀ
+              Quantità
             </Text>
             <TextInput
               value={quantita}
               onChangeText={setQuantita}
               keyboardType="decimal-pad"
-              style={stileInput}
+              style={[...stileInput, styles.cifre]}
               selectTextOnFocus
+              accessibilityLabel="Quantità"
             />
-
+          </View>
+          <View style={styles.colonnaLarga}>
             <Text style={[styles.etichetta, { color: t.testoSecondario }]}>
-              PREZZO UNITARIO (€)
+              Prezzo unitario (€)
             </Text>
             <TextInput
               value={prezzo}
@@ -197,50 +166,55 @@ export function FoglioNuovaVoce({
               keyboardType="decimal-pad"
               placeholder="0,00"
               placeholderTextColor={t.testoSecondario}
-              style={stileInput}
+              style={[...stileInput, styles.cifre]}
+              accessibilityLabel="Prezzo unitario in euro"
             />
-
-            <View style={styles.subtotale}>
-              <Text style={[styles.subtotaleEtichetta, { color: t.testo }]}>
-                Subtotale Riga:
-              </Text>
-              <Text style={[styles.subtotaleValore, { color: t.accento }]}>
-                {formattaEuro(subtotale)}
-              </Text>
-            </View>
-
-            <Pressable
-              onPress={conferma}
-              disabled={!valida}
-              style={({ pressed }) => [
-                styles.bottone,
-                { backgroundColor: t.bottonePrimario },
-                !valida && styles.disabilitato,
-                pressed && styles.premuto,
-              ]}
-              accessibilityRole="button"
-            >
-              <Text style={styles.bottoneTesto}>
-                {inModifica ? '✓ Salva voce' : '＋ Aggiungi al Preventivo'}
-              </Text>
-            </Pressable>
-          </ScrollView>
+          </View>
         </View>
-      </KeyboardAvoidingView>
-    </Modal>
+
+        <View style={[styles.subtotale, { backgroundColor: t.riquadro }]}>
+          <Text
+            style={[styles.subtotaleEtichetta, { color: t.testoSecondario }]}
+          >
+            Totale della riga
+          </Text>
+          <Text style={[styles.subtotaleValore, { color: t.testo }]}>
+            {formattaEuro(subtotale)}
+          </Text>
+        </View>
+
+        <Pressable
+          onPress={conferma}
+          disabled={!valida}
+          style={({ pressed }) => [
+            styles.bottone,
+            { backgroundColor: t.bottonePrimario },
+            !valida && styles.disabilitato,
+            pressed && styles.premuto,
+          ]}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: !valida }}
+        >
+          <Text style={[styles.bottoneTesto, { color: t.testoSuPrimario }]}>
+            {inModifica ? 'Salva la voce' : 'Aggiungi al preventivo'}
+          </Text>
+        </Pressable>
+      </ScrollView>
+    </FoglioInBasso>
   );
 }
 
 function Chip({
+  t,
   testo,
   attivo,
   onPress,
 }: {
+  t: Tema;
   testo: string;
   attivo: boolean;
   onPress: () => void;
 }) {
-  const t = useTema();
   return (
     <Pressable
       onPress={onPress}
@@ -254,7 +228,15 @@ function Chip({
       accessibilityRole="button"
       accessibilityState={{ selected: attivo }}
     >
-      <Text style={[styles.chipTesto, { color: attivo ? '#FFFFFF' : t.testo }]}>
+      <Text
+        style={[
+          styles.chipTesto,
+          {
+            color: attivo ? t.testoSuPrimario : t.testo,
+            fontFamily: attivo ? FONT.grassetto : FONT.semi,
+          },
+        ]}
+      >
         {testo}
       </Text>
     </Pressable>
@@ -262,70 +244,57 @@ function Chip({
 }
 
 const styles = StyleSheet.create({
-  contenitore: { flex: 1, justifyContent: 'flex-end' },
-  foglio: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderTopWidth: 2,
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    maxHeight: '90%',
-    width: '100%',
-    maxWidth: 720,
-    alignSelf: 'center',
-  },
-  maniglia: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: 14,
-  },
-  testa: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  titolo: { fontSize: 18, fontWeight: '800' },
-  chiudi: { fontSize: 18, fontWeight: '700' },
   etichetta: {
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 0.4,
-    marginTop: 16,
+    fontSize: 13,
+    fontFamily: FONT.grassetto,
+    marginTop: 14,
     marginBottom: 6,
   },
   chips: { gap: 8, paddingVertical: 2 },
   chip: {
+    height: 36,
     borderWidth: 1,
     borderRadius: 999,
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    justifyContent: 'center',
   },
-  chipTesto: { fontSize: 13, fontWeight: '600' },
+  chipTesto: { fontSize: 13 },
   input: {
     borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 12,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    minHeight: 48,
     paddingVertical: 12,
-    fontSize: 15,
+    fontSize: 16,
+    fontFamily: FONT.regolare,
   },
+  cifre: { fontVariant: ['tabular-nums'] },
+  affiancati: { flexDirection: 'row', gap: 12 },
+  colonnaStretta: { flex: 2 },
+  colonnaLarga: { flex: 3 },
   subtotale: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginTop: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
   },
-  subtotaleEtichetta: { fontSize: 15, fontWeight: '700' },
-  subtotaleValore: { fontSize: 16, fontWeight: '800' },
+  subtotaleEtichetta: { fontSize: 14, fontFamily: FONT.semi },
+  subtotaleValore: {
+    fontSize: 18,
+    fontFamily: FONT.pieno,
+    fontVariant: ['tabular-nums'],
+  },
   bottone: {
-    borderRadius: 10,
-    paddingVertical: 14,
+    height: 56,
+    borderRadius: 16,
     alignItems: 'center',
+    justifyContent: 'center',
     marginTop: 16,
   },
-  bottoneTesto: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
+  bottoneTesto: { fontSize: 16, fontFamily: FONT.pieno },
   disabilitato: { opacity: 0.45 },
   premuto: { opacity: 0.85, transform: [{ scale: 0.98 }] },
 });

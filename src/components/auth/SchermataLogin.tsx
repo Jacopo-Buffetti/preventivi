@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTema } from '../../constants/tema';
+import { FONT, useTema } from '../../constants/tema';
 import { supabase } from '../../services/supabase';
 import { FormInput } from '../ui/FormInput';
 import { PrimaryButton } from '../ui/PrimaryButton';
@@ -70,8 +70,8 @@ export function SchermataLogin() {
 
         <Text style={[styles.titolo, { color: t.testo }]}>Accedi</Text>
         <Text style={[styles.sottotitolo, { color: t.testoSecondario }]}>
-          Serve solo la prima volta su questo dispositivo: poi l'accesso resta salvato e
-          l'app funziona anche senza connessione.
+          Serve solo la prima volta su questo dispositivo: poi l'accesso resta
+          salvato e l'app funziona anche senza connessione.
         </Text>
 
         <FormInput
@@ -109,7 +109,9 @@ export function SchermataLogin() {
 
         {errore && (
           <View style={[styles.boxErrore, { borderColor: t.pericolo }]}>
-            <Text style={[styles.testoErrore, { color: t.pericolo }]}>{errore}</Text>
+            <Text style={[styles.testoErrore, { color: t.pericolo }]}>
+              {errore}
+            </Text>
           </View>
         )}
 
@@ -145,15 +147,35 @@ const styles = StyleSheet.create({
     maxWidth: 480,
     alignSelf: 'center',
   },
-  logo: { width: 140, height: 140, alignSelf: 'center', marginBottom: 24 },
-  titolo: { fontSize: 26, fontWeight: '800', letterSpacing: -0.3 },
-  sottotitolo: { fontSize: 14, lineHeight: 20, marginTop: 6, marginBottom: 24 },
+  // Il logo è disegnato in blu notte: sul tema scuro sparirebbe, quindi
+  // sta sempre su un riquadro bianco, come nella Home
+  logo: {
+    width: 140,
+    height: 140,
+    alignSelf: 'center',
+    marginBottom: 28,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 32,
+  },
+  titolo: {
+    fontSize: 30,
+    lineHeight: 36,
+    fontFamily: FONT.pieno,
+    letterSpacing: -0.5,
+  },
+  sottotitolo: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 6,
+    marginBottom: 24,
+    fontFamily: FONT.regolare,
+  },
   boxErrore: {
     borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 12,
+    borderRadius: 14,
+    paddingHorizontal: 14,
     paddingVertical: 10,
     marginBottom: 8,
   },
-  testoErrore: { fontSize: 14, fontWeight: '600' },
+  testoErrore: { fontSize: 14, fontFamily: FONT.semi },
 });

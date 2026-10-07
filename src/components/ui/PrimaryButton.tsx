@@ -5,7 +5,7 @@ import {
   StyleSheet,
   Text,
 } from 'react-native';
-import { useTema } from '../../constants/tema';
+import { FONT, useTema } from '../../constants/tema';
 
 interface PrimaryButtonProps extends PressableProps {
   title: string;
@@ -38,9 +38,9 @@ export function PrimaryButton({
       {...props}
     >
       {loading ? (
-        <ActivityIndicator color="#FFFFFF" />
+        <ActivityIndicator color={t.testoSuPrimario} />
       ) : (
-        <Text style={styles.text}>{title}</Text>
+        <Text style={[styles.text, { color: t.testoSuPrimario }]}>{title}</Text>
       )}
     </Pressable>
   );
@@ -49,11 +49,12 @@ export function PrimaryButton({
 const styles = StyleSheet.create({
   button: {
     paddingVertical: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     alignItems: 'center',
     marginTop: 10,
   },
   disabled: { opacity: 0.6 },
   pressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },
-  text: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  // Testo blu notte sul pulsante ottone (il bianco sull'ottone si legge male)
+  text: { fontSize: 16, fontFamily: FONT.pieno },
 });

@@ -1,28 +1,39 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, usePathname, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTema } from '../../constants/tema';
+import { FormInput } from '../../components/ui/FormInput';
+import { FONT, useTema } from '../../constants/tema';
 import {
   addCliente,
   getClienteById,
   updateCliente,
 } from '../../services/databaseService';
+import { segnaClienteCreato } from '../../utils/clienteAppenaCreato';
 import { avviso } from '../../utils/dialoghi';
 
+// Form del cliente: nuovo o modifica (con idCliente).
+// Lo stesso componente è registrato anche come /preventivi/nuovo-cliente,
+// quando il cliente si crea mentre si scrive un preventivo.
 export default function NuovoClienteScreen() {
   const router = useRouter();
+  const percorso = usePathname();
   const { idCliente } = useLocalSearchParams<{ idCliente?: string }>();
   const t = useTema();
   const insets = useSafeAreaInsets();
+
+  const inModifica = !!idCliente;
+  // Aperto dal form del preventivo: dopo il salvataggio si torna lì
+  const dalPreventivo = percorso.startsWith('/preventivi');
 
   const [nome, setNome] = useState('');
   const [indirizzo, setIndirizzo] = useState('');
@@ -30,34 +41,58 @@ export default function NuovoClienteScreen() {
   const [email, setEmail] = useState('');
   const [note, setNote] = useState('');
   const [salvando, setSalvando] = useState(false);
+  const [caricamento, setCaricamento] = useState(inModifica);
+
+  useEffect(() => {
+    if (!idCliente) return;
+    let attivo = true;
+    getClienteById(idCliente)
+      .then((c) => {
+        if (!attivo || !c) return;
+        setNome(c.nome || '');
+        setIndirizzo(c.indirizzo || '');
+        setTelefono(c.telefono || '');
+        setEmail(c.email || '');
+        setNote(c.note || '');
+      })
+      .catch((err) => {
+        console.error(err);
+        avviso('Errore', 'Impossibile caricare i dati del cliente.');
+      })
+      .finally(() => attivo && setCaricamento(false));
+    return () => {
+      attivo = false;
+    };
+  }, [idCliente]);
 
   const salva = async () => {
     if (!nome.trim()) {
-      avviso('Attenzione', 'Inserisci il nome del cliente.');
+      avviso('Manca il nome', 'Scrivi il nome del cliente per salvarlo.');
       return;
     }
+    const dati = {
+      nome: nome.trim(),
+      indirizzo: indirizzo.trim(),
+      telefono: telefono.trim(),
+      email: email.trim(),
+      note: note.trim(),
+    };
     try {
       setSalvando(true);
       if (idCliente) {
-        await updateCliente(idCliente, {
-          nome: nome.trim(),
-          indirizzo: indirizzo.trim(),
-          telefono: telefono.trim(),
-          email: email.trim(),
-          note: note.trim(),
-        });
-        router.replace({
-          pathname: '/clienti/[idCliente]',
-          params: { idCliente },
-        });
+        // Modifica: si torna alla scheda, che si ricarica da sola
+        await updateCliente(idCliente, dati);
+        router.back();
+      } else if (dalPreventivo) {
+        // Nuovo cliente durante un preventivo: si torna al preventivo,
+        // che lo troverà già scelto (vedi clienteAppenaCreato.ts)
+        const id = await addCliente(dati);
+        segnaClienteCreato(id);
+        router.back();
       } else {
-        const id = await addCliente({
-          nome: nome.trim(),
-          indirizzo: indirizzo.trim(),
-          telefono: telefono.trim(),
-          email: email.trim(),
-          note: note.trim(),
-        });
+        // Nuovo cliente dalla rubrica: si apre la sua scheda.
+        // replace: con "indietro" dalla scheda si torna alla rubrica, non al form
+        const id = await addCliente(dati);
         router.replace({
           pathname: '/clienti/[idCliente]',
           params: { idCliente: id },
@@ -71,123 +106,103 @@ export default function NuovoClienteScreen() {
     }
   };
 
-  useEffect(() => {
-    if (!idCliente) return;
-    let mounted = true;
-    (async () => {
-      try {
-        const c = await getClienteById(idCliente);
-        if (!mounted || !c) return;
-        setNome(c.nome || '');
-        setIndirizzo(c.indirizzo || '');
-        setTelefono(c.telefono || '');
-        setEmail(c.email || '');
-        setNote(c.note || '');
-      } catch (err) {
-        console.error(err);
-        avviso('Errore', 'Impossibile caricare i dati del cliente.');
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, [idCliente]);
+  if (caricamento) {
+    return (
+      <View
+        style={[styles.container, styles.centro, { backgroundColor: t.sfondo }]}
+      >
+        <ActivityIndicator color={t.ottone} size="large" />
+      </View>
+    );
+  }
 
   return (
-    <View style={[styles.container, { backgroundColor: t.sfondo }]}>
-      <View style={[styles.barra, { paddingTop: insets.top + 12 }]}>
+    <KeyboardAvoidingView
+      style={[styles.container, { backgroundColor: t.sfondo }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      {/* --- BARRA IN ALTO --- */}
+      <View style={[styles.barra, { paddingTop: insets.top + 8 }]}>
         <Pressable
           onPress={() => router.back()}
-          hitSlop={12}
+          hitSlop={8}
           accessibilityRole="button"
+          style={styles.annulla}
         >
-          <Text style={[styles.annulla, { color: t.testoSecondario }]}>
+          <Text style={[styles.annullaTesto, { color: t.testoSecondario }]}>
             Annulla
           </Text>
         </Pressable>
-        <Text style={[styles.titoloBarra, { color: t.testo }]}>
-          Nuovo Cliente
+        <Text
+          style={[styles.titoloBarra, { color: t.testo }]}
+          accessibilityRole="header"
+        >
+          {inModifica ? 'Modifica cliente' : 'Nuovo cliente'}
         </Text>
-        <View style={styles.segnapostoBarra} />
+        <View style={styles.annulla} />
       </View>
 
       <ScrollView
-        contentContainerStyle={[
-          styles.contenuto,
-          { paddingBottom: insets.bottom + 32 },
-        ]}
+        contentContainerStyle={[styles.contenuto, { paddingBottom: 24 }]}
+        keyboardShouldPersistTaps="handled"
       >
-        <Text style={[styles.etichetta, { color: t.testoSecondario }]}>
-          NOME
-        </Text>
-        <TextInput
+        <FormInput
+          label="Nome e cognome, o ragione sociale"
           value={nome}
           onChangeText={setNome}
-          placeholder="Es. Rossi Mario"
-          placeholderTextColor={t.testoSecondario}
-          style={[
-            styles.input,
-            { backgroundColor: t.input, borderColor: t.bordo, color: t.testo },
-          ]}
+          placeholder="es. Mario Rossi"
+          autoCapitalize="words"
+          returnKeyType="next"
         />
-
-        <Text style={[styles.etichetta, { color: t.testoSecondario }]}>
-          INDIRIZZO
-        </Text>
-        <TextInput
-          value={indirizzo}
-          onChangeText={setIndirizzo}
-          placeholder="Via..., Città"
-          placeholderTextColor={t.testoSecondario}
-          style={[
-            styles.input,
-            { backgroundColor: t.input, borderColor: t.bordo, color: t.testo },
-          ]}
-        />
-
-        <Text style={[styles.etichetta, { color: t.testoSecondario }]}>
-          TELEFONO
-        </Text>
-        <TextInput
+        <FormInput
+          label="Telefono"
           value={telefono}
           onChangeText={setTelefono}
-          placeholder="333 0000000"
-          placeholderTextColor={t.testoSecondario}
-          style={[
-            styles.input,
-            { backgroundColor: t.input, borderColor: t.bordo, color: t.testo },
-          ]}
+          placeholder="es. 333 123 4567"
+          keyboardType="phone-pad"
+          textContentType="telephoneNumber"
+          aiuto="Serve anche per inviare i preventivi su WhatsApp."
         />
-
-        <Text style={[styles.etichetta, { color: t.testoSecondario }]}>
-          EMAIL
-        </Text>
-        <TextInput
+        <FormInput
+          label="Email"
           value={email}
           onChangeText={setEmail}
-          placeholder="mail@example.com"
-          placeholderTextColor={t.testoSecondario}
-          style={[
-            styles.input,
-            { backgroundColor: t.input, borderColor: t.bordo, color: t.testo },
-          ]}
+          placeholder="es. mario.rossi@email.it"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+          textContentType="emailAddress"
         />
-
-        <Text style={[styles.etichetta, { color: t.testoSecondario }]}>
-          NOTE
-        </Text>
-        <TextInput
+        <FormInput
+          label="Indirizzo"
+          value={indirizzo}
+          onChangeText={setIndirizzo}
+          placeholder="es. Via Roma 12, Narni"
+          textContentType="fullStreetAddress"
+          aiuto="Compare sul preventivo."
+        />
+        <FormInput
+          label="Note"
           value={note}
           onChangeText={setNote}
-          placeholder="Note"
-          placeholderTextColor={t.testoSecondario}
-          style={[
-            styles.inputMultiline,
-            { backgroundColor: t.input, borderColor: t.bordo, color: t.testo },
-          ]}
+          placeholder="es. Citofono non funzionante, chiamare prima"
           multiline
+          style={styles.note}
+          textAlignVertical="top"
         />
+      </ScrollView>
 
+      {/* --- BARRA IN BASSO --- */}
+      <View
+        style={[
+          styles.barraSalva,
+          {
+            backgroundColor: t.barraTab,
+            borderTopColor: t.bordo,
+            paddingBottom: insets.bottom + 12,
+          },
+        ]}
+      >
         <Pressable
           onPress={salva}
           disabled={salvando}
@@ -200,67 +215,59 @@ export default function NuovoClienteScreen() {
           accessibilityRole="button"
         >
           {salvando ? (
-            <ActivityIndicator color="#FFFFFF" />
+            <ActivityIndicator color={t.testoSuPrimario} />
           ) : (
-            <Text style={styles.salvaTesto}>💾 Salva cliente</Text>
+            <Text style={[styles.salvaTesto, { color: t.testoSuPrimario }]}>
+              {inModifica ? 'Salva modifiche' : 'Salva cliente'}
+            </Text>
           )}
         </Pressable>
-      </ScrollView>
-    </View>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  centro: { alignItems: 'center', justifyContent: 'center' },
+
   barra: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingBottom: 8,
     width: '100%',
     maxWidth: 720,
     alignSelf: 'center',
   },
-  annulla: { fontSize: 15, width: 70 },
-  titoloBarra: { fontSize: 17, fontWeight: '800' },
-  segnapostoBarra: { width: 70 },
+  annulla: {
+    width: 80,
+    height: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  annullaTesto: { fontSize: 15, fontFamily: FONT.semi },
+  titoloBarra: { fontSize: 17, fontFamily: FONT.pieno },
+
   contenuto: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
+    paddingTop: 12,
     width: '100%',
     maxWidth: 720,
     alignSelf: 'center',
   },
-  etichetta: {
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 0.4,
-    marginTop: 16,
-    marginBottom: 6,
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    fontSize: 15,
-  },
-  inputMultiline: {
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    fontSize: 15,
-    minHeight: 100,
-    textAlignVertical: 'top',
-  },
+  note: { minHeight: 100 },
+
+  barraSalva: { paddingHorizontal: 20, paddingTop: 12, borderTopWidth: 1 },
   salva: {
-    borderRadius: 10,
-    paddingVertical: 16,
+    height: 56,
+    borderRadius: 16,
     alignItems: 'center',
-    marginTop: 20,
+    justifyContent: 'center',
   },
-  salvaTesto: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
+  salvaTesto: { fontSize: 16, fontFamily: FONT.pieno },
+
   disabilitato: { opacity: 0.6 },
   premuto: { opacity: 0.85, transform: [{ scale: 0.98 }] },
 });

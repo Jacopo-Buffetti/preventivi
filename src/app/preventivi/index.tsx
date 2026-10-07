@@ -1,36 +1,46 @@
+import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  FlatList,
   Pressable,
   RefreshControl,
+  ScrollView,
+  SectionList,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { coloriStato, ETICHETTE_STATO } from '../../constants/stati';
+import {
+  FONT,
+  useSceltaTema,
+  useTema,
+  type NomeTema,
+  type Tema,
+} from '../../constants/tema';
 import { useCaricaQuandoVisibile } from '../../hooks/useCaricaQuandoVisibile';
-import { STATI } from '../../constants/stati';
-import { useTema, type Tema } from '../../constants/tema';
 import {
   getAllPreventivi,
   type Preventivo,
+  type StatoPreventivo,
 } from '../../services/databaseService';
-import { condividiPdfPreventivo } from '../../services/pdfService';
 import { useTiraPerAggiornare } from '../../services/syncAutomatico';
 import { avviso } from '../../utils/dialoghi';
-import { prontoPerInvio } from '../../utils/invioPreventivo';
-import {
-  formattaData,
-  formattaEuro,
-  formattaNumeroPreventivo,
-} from '../../utils/formato';
+import { formattaEuro, formattaNumeroPreventivo } from '../../utils/formato';
 
-function numeroPreventivo(p: Preventivo): string {
-  return formattaNumeroPreventivo(p.anno, p.numero_preventivo);
-}
+// Filtri in alto: "tutti" più i quattro stati
+type Filtro = 'tutti' | StatoPreventivo;
+
+const FILTRI: { valore: Filtro; etichetta: string }[] = [
+  { valore: 'tutti', etichetta: 'Tutti' },
+  { valore: 'bozza', etichetta: 'Bozze' },
+  { valore: 'inviato', etichetta: 'Inviati' },
+  { valore: 'accettato', etichetta: 'Accettati' },
+  { valore: 'rifiutato', etichetta: 'Rifiutati' },
+];
 
 // --- SCHERMATA --------------------------------------------------------------
 
@@ -38,10 +48,12 @@ export default function PreventiviScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const t = useTema();
+  const { nome: nomeTema } = useSceltaTema();
 
   const [preventivi, setPreventivi] = useState<Preventivo[]>([]);
   const [caricamento, setCaricamento] = useState(true);
   const [ricerca, setRicerca] = useState('');
+  const [filtro, setFiltro] = useState<Filtro>('tutti');
 
   const { aggiornando, aggiorna } = useTiraPerAggiornare();
 
@@ -57,16 +69,35 @@ export default function PreventiviScreen() {
       .finally(() => setCaricamento(false));
   });
 
-  const filtrati = useMemo(() => {
+  // Quanti preventivi per ogni filtro (i numeri accanto alle etichette)
+  const conteggi = useMemo(() => {
+    const c: Record<Filtro, number> = {
+      tutti: preventivi.length,
+      bozza: 0,
+      inviato: 0,
+      accettato: 0,
+      rifiutato: 0,
+    };
+    for (const p of preventivi) c[p.stato]++;
+    return c;
+  }, [preventivi]);
+
+  // Ricerca + filtro, poi raggruppamento per periodo
+  const sezioni = useMemo(() => {
     const q = ricerca.trim().toLowerCase();
-    if (!q) return preventivi;
-    return preventivi.filter(
-      (p) =>
-        numeroPreventivo(p).includes(q) ||
+    const filtrati = preventivi.filter((p) => {
+      if (filtro !== 'tutti' && p.stato !== filtro) return false;
+      if (!q) return true;
+      return (
+        formattaNumeroPreventivo(p.anno, p.numero_preventivo)
+          .toLowerCase()
+          .includes(q) ||
         (p.cliente_nome ?? '').toLowerCase().includes(q) ||
         (p.oggetto ?? '').toLowerCase().includes(q)
-    );
-  }, [preventivi, ricerca]);
+      );
+    });
+    return raggruppaPerPeriodo(filtrati);
+  }, [preventivi, ricerca, filtro]);
 
   const apriDettaglio = (p: Preventivo) =>
     router.push({
@@ -74,50 +105,40 @@ export default function PreventiviScreen() {
       params: { idPreventivo: p.id },
     });
 
-  const apriModifica = (p: Preventivo) =>
-    router.push({
-      pathname: '/preventivi/nuovo',
-      params: { idPreventivo: p.id },
-    });
-
-  // Condivisione rapida dalla lista: anche da qui una bozza deve prima
-  // ricevere il numero dal server, come dal dettaglio
-  const condividiPdf = async (p: Preventivo) => {
-    try {
-      const pronto = await prontoPerInvio(p);
-      if (!pronto) return;
-      // Aggiorna subito la riga in lista con numero e stato nuovi
-      setPreventivi((lista) => lista.map((x) => (x.id === pronto.id ? pronto : x)));
-      await condividiPdfPreventivo(pronto.id);
-    } catch (err) {
-      console.error(err);
-      avviso('Errore', 'Impossibile generare il PDF del preventivo.');
-    }
-  };
-
   const totale = preventivi.length;
 
   return (
     <View style={[styles.container, { backgroundColor: t.sfondo }]}>
-      <FlatList
-        data={filtrati}
+      <SectionList
+        sections={sezioni}
         keyExtractor={(p) => p.id}
+        stickySectionHeadersEnabled={false}
         refreshControl={
-          <RefreshControl refreshing={aggiornando} onRefresh={aggiorna} tintColor={t.accento} />
+          <RefreshControl
+            refreshing={aggiornando}
+            onRefresh={aggiorna}
+            tintColor={t.ottone}
+            colors={[t.ottone]}
+          />
         }
         contentContainerStyle={[
           styles.lista,
-          { paddingTop: insets.top + 24, paddingBottom: 100 },
+          { paddingTop: insets.top + 20, paddingBottom: 110 },
         ]}
         keyboardShouldPersistTaps="handled"
         ListHeaderComponent={
           <View style={styles.intestazione}>
-            <Text style={[styles.titolo, { color: t.testo }]}>
-              Tutti i Preventivi
-            </Text>
-            <Text style={[styles.conteggio, { color: t.accento }]}>
-              {totale} {totale === 1 ? 'DOCUMENTO' : 'DOCUMENTI'} IN ARCHIVIO
-            </Text>
+            <View style={{ gap: 2 }}>
+              <Text
+                style={[styles.titolo, { color: t.testo }]}
+                accessibilityRole="header"
+              >
+                Preventivi
+              </Text>
+              <Text style={[styles.conteggio, { color: t.testoSecondario }]}>
+                {totale} {totale === 1 ? 'documento' : 'documenti'} in archivio
+              </Text>
+            </View>
 
             <View
               style={[
@@ -125,23 +146,77 @@ export default function PreventiviScreen() {
                 { backgroundColor: t.input, borderColor: t.bordo },
               ]}
             >
-              <Text style={styles.ricercaIcona}>🔍</Text>
+              <Feather name="search" size={19} color={t.testoSecondario} />
               <TextInput
                 value={ricerca}
                 onChangeText={setRicerca}
-                placeholder="Cerca per N° preventivo o cliente..."
+                placeholder="Cerca per numero, cliente o lavoro"
                 placeholderTextColor={t.testoSecondario}
                 style={[styles.ricercaInput, { color: t.testo }]}
                 returnKeyType="search"
                 autoCorrect={false}
                 clearButtonMode="while-editing"
+                accessibilityLabel="Cerca preventivi"
               />
             </View>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.filtri}
+              style={styles.filtriContenitore}
+            >
+              {FILTRI.map((f) => {
+                const attivo = filtro === f.valore;
+                return (
+                  <Pressable
+                    key={f.valore}
+                    onPress={() => setFiltro(f.valore)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: attivo }}
+                    style={[
+                      styles.filtro,
+                      attivo
+                        ? {
+                            backgroundColor:
+                              nomeTema === 'dark'
+                                ? t.bottonePrimario
+                                : t.intestazione,
+                            borderColor: 'transparent',
+                          }
+                        : { backgroundColor: t.card, borderColor: t.bordo },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.filtroTesto,
+                        attivo
+                          ? {
+                              color:
+                                nomeTema === 'dark'
+                                  ? t.testoSuPrimario
+                                  : '#FFFFFF',
+                              fontFamily: FONT.grassetto,
+                            }
+                          : { color: t.testo },
+                      ]}
+                    >
+                      {f.etichetta} {conteggi[f.valore]}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
           </View>
         }
+        renderSectionHeader={({ section }) => (
+          <Text style={[styles.titoloPeriodo, { color: t.testoSecondario }]}>
+            {section.titolo}
+          </Text>
+        )}
         ListEmptyComponent={
           caricamento ? (
-            <ActivityIndicator color={t.accento} style={styles.vuoto} />
+            <ActivityIndicator color={t.ottone} style={styles.vuoto} />
           ) : (
             <Text
               style={[
@@ -150,20 +225,18 @@ export default function PreventiviScreen() {
                 { color: t.testoSecondario },
               ]}
             >
-              {ricerca
+              {ricerca || filtro !== 'tutti'
                 ? 'Nessun preventivo corrisponde alla ricerca.'
                 : 'Non hai ancora creato preventivi.\nTocca + per crearne uno.'}
             </Text>
           )
         }
-        ItemSeparatorComponent={() => <View style={styles.separatore} />}
         renderItem={({ item }) => (
-          <CardPreventivo
-            preventivo={item}
+          <RigaPreventivo
+            p={item}
             t={t}
+            nomeTema={nomeTema}
             onApri={() => apriDettaglio(item)}
-            onModifica={() => apriModifica(item)}
-            onCondividi={() => condividiPdf(item)}
           />
         )}
       />
@@ -173,115 +246,128 @@ export default function PreventiviScreen() {
         onPress={() => router.push('/preventivi/nuovo')}
         style={({ pressed }) => [
           styles.fab,
-          { backgroundColor: t.bottonePrimario, bottom: 24 },
+          { backgroundColor: t.bottonePrimario },
           pressed && styles.premuto,
         ]}
         accessibilityRole="button"
         accessibilityLabel="Nuovo preventivo"
       >
-        <Text style={styles.fabTesto}>+</Text>
+        <Feather name="plus" size={26} color={t.testoSuPrimario} />
       </Pressable>
     </View>
   );
 }
 
-// --- CARD -------------------------------------------------------------------
+// --- RIGA -------------------------------------------------------------------
 
-function CardPreventivo({
-  preventivo: p,
+function RigaPreventivo({
+  p,
   t,
+  nomeTema,
   onApri,
-  onModifica,
-  onCondividi,
 }: {
-  preventivo: Preventivo;
+  p: Preventivo;
   t: Tema;
+  nomeTema: NomeTema;
   onApri: () => void;
-  onModifica: () => void;
-  onCondividi: () => void;
 }) {
-  const stato = STATI[p.stato] ?? STATI.bozza;
+  const bozza = p.numero_preventivo === null;
+  const stato = coloriStato(p.stato, nomeTema);
+  const rifiutato = p.stato === 'rifiutato';
 
-  // La card è una View: la parte superiore e i due pulsanti sono Pressable
-  // fratelli, non annidati. Sul web ogni Pressable con ruolo "button"
-  // diventa un <button>, e un <button> dentro un altro <button> non è valido.
   return (
-    <View
-      style={[styles.card, { backgroundColor: t.card, borderColor: t.bordo }]}
+    <Pressable
+      onPress={onApri}
+      accessibilityRole="button"
+      accessibilityLabel={`Apri preventivo ${formattaNumeroPreventivo(p.anno, p.numero_preventivo)}, ${p.cliente_nome ?? ''}`}
+      style={({ pressed }) => [
+        styles.riga,
+        {
+          backgroundColor: t.card,
+          // Le bozze senza numero hanno il bordo tratteggiato: si riconoscono al volo
+          borderColor: bozza ? t.testoSecondario : t.bordo,
+          borderStyle: bozza ? 'dashed' : 'solid',
+          borderWidth: bozza ? 1.5 : 1,
+        },
+        pressed && styles.premuto,
+      ]}
     >
-      <Pressable
-        onPress={onApri}
-        style={({ pressed }) => [
-          styles.cardContenuto,
-          pressed && styles.contenutoPremuto,
-        ]}
-        accessibilityRole="button"
-        accessibilityLabel={`Apri preventivo ${numeroPreventivo(p)}, ${p.cliente_nome ?? ''}`}
-      >
-        <View style={styles.cardTesta}>
-          <Text style={[styles.numero, { color: t.testo }]}>
-            N° {numeroPreventivo(p)}
-          </Text>
-          <View
-            style={[
-              styles.badge,
-              { backgroundColor: stato.sfondo, borderColor: stato.colore },
-            ]}
-          >
-            <Text style={[styles.badgeTesto, { color: stato.colore }]}>
-              {stato.etichetta}
-            </Text>
-          </View>
-        </View>
-
+      <View style={styles.rigaTesti}>
+        <Text style={[styles.rigaNumero, { color: t.testoSecondario }]}>
+          {bozza
+            ? 'Bozza, senza numero'
+            : `N. ${formattaNumeroPreventivo(p.anno, p.numero_preventivo)}`}
+        </Text>
         <Text
-          style={[styles.meta, { color: t.testoSecondario }]}
+          style={[styles.rigaOggetto, { color: t.testo }]}
           numberOfLines={1}
         >
-          👤 {p.cliente_nome ?? 'Cliente'} • {formattaData(p.data_creazione)}
+          {p.oggetto?.trim() || 'Senza oggetto'}
         </Text>
-
-        {!!p.oggetto && (
-          <Text style={[styles.oggetto, { color: t.testo }]} numberOfLines={2}>
-            {p.oggetto}
-          </Text>
-        )}
-
-        <Text style={[styles.importo, { color: t.accento }]}>
+        <Text
+          style={[styles.rigaCliente, { color: t.testoSecondario }]}
+          numberOfLines={1}
+        >
+          {p.cliente_nome ?? 'Cliente'}
+        </Text>
+      </View>
+      <View style={styles.rigaDestra}>
+        <Text
+          style={[
+            styles.rigaImporto,
+            { color: rifiutato ? t.testoSecondario : t.testo },
+            rifiutato && styles.barrato,
+          ]}
+        >
           {formattaEuro(p.totale_generale)}
         </Text>
-      </Pressable>
-
-      <View style={styles.azioni}>
-        <Pressable
-          onPress={onCondividi}
-          style={({ pressed }) => [
-            styles.bottone,
-            { backgroundColor: t.bottonePrimario },
-            pressed && styles.premuto,
-          ]}
-          accessibilityRole="button"
-        >
-          <Text style={[styles.bottoneTesto, { color: '#FFFFFF' }]}>
-            📄 Condividi PDF
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={onModifica}
-          style={({ pressed }) => [
-            styles.bottone,
-            { backgroundColor: t.bottoneSecondario },
-            pressed && styles.premuto,
-          ]}
-          accessibilityRole="button"
-        >
-          <Text style={[styles.bottoneTesto, { color: t.testo }]}>
-            ✏️ Modifica
-          </Text>
-        </Pressable>
+        {!bozza && (
+          <View style={[styles.badge, { backgroundColor: stato.sfondo }]}>
+            <Text style={[styles.badgeTesto, { color: stato.colore }]}>
+              {ETICHETTE_STATO[p.stato]}
+            </Text>
+          </View>
+        )}
       </View>
-    </View>
+    </Pressable>
   );
+}
+
+// --- RAGGRUPPAMENTO PER PERIODO ----------------------------------------------
+
+// La lista arriva già ordinata dal più recente: basta scorrerla e aprire
+// un gruppo nuovo ogni volta che cambia il periodo
+function raggruppaPerPeriodo(lista: Preventivo[]) {
+  const gruppi: { titolo: string; data: Preventivo[] }[] = [];
+  for (const p of lista) {
+    const titolo = periodo(p.data_creazione);
+    const ultimo = gruppi[gruppi.length - 1];
+    if (ultimo && ultimo.titolo === titolo) ultimo.data.push(p);
+    else gruppi.push({ titolo, data: [p] });
+  }
+  return gruppi;
+}
+
+function periodo(data: string): string {
+  const d = new Date(data);
+  const oggi = new Date();
+  const giorni = Math.floor(
+    (Date.UTC(oggi.getFullYear(), oggi.getMonth(), oggi.getDate()) -
+      Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())) /
+      86_400_000
+  );
+  if (giorni < 7) return 'Ultimi 7 giorni';
+  if (
+    d.getFullYear() === oggi.getFullYear() &&
+    d.getMonth() === oggi.getMonth()
+  ) {
+    return 'Prima, in questo mese';
+  }
+  const testo = d.toLocaleDateString('it-IT', {
+    month: 'long',
+    year: 'numeric',
+  });
+  return testo.charAt(0).toUpperCase() + testo.slice(1);
 }
 
 // --- STILI ------------------------------------------------------------------
@@ -289,82 +375,100 @@ function CardPreventivo({
 const styles = StyleSheet.create({
   container: { flex: 1 },
   lista: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     width: '100%',
     maxWidth: 720,
     alignSelf: 'center',
   },
 
-  intestazione: { marginBottom: 16 },
-  titolo: { fontSize: 24, fontWeight: '800', letterSpacing: -0.4 },
-  conteggio: {
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 0.6,
-    marginTop: 2,
+  intestazione: { gap: 14, marginBottom: 4 },
+  titolo: {
+    fontSize: 30,
+    lineHeight: 36,
+    fontFamily: FONT.pieno,
+    letterSpacing: -0.5,
   },
+  conteggio: { fontSize: 13, fontFamily: FONT.regolare },
 
   ricerca: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 10,
     borderWidth: 1,
-    borderRadius: 12,
+    borderRadius: 14,
     paddingHorizontal: 14,
-    marginTop: 20,
+    height: 48,
   },
-  ricercaIcona: { fontSize: 14, marginRight: 8 },
-  ricercaInput: { flex: 1, fontSize: 15, paddingVertical: 12 },
-
-  separatore: { height: 12 },
-
-  card: { borderWidth: 1, borderRadius: 14, overflow: 'hidden' },
-  cardContenuto: { padding: 14, paddingBottom: 0 },
-  contenutoPremuto: { opacity: 0.7 },
-  cardTesta: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 8,
-  },
-  numero: { fontSize: 17, fontWeight: '800' },
-  badge: {
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-  },
-  badgeTesto: { fontSize: 11, fontWeight: '800', letterSpacing: 0.4 },
-  meta: { fontSize: 13, marginTop: 2 },
-  oggetto: { fontSize: 15, fontWeight: '700', marginTop: 12 },
-  importo: { fontSize: 17, fontWeight: '800', marginTop: 8 },
-
-  azioni: { flexDirection: 'row', gap: 8, padding: 14 },
-  bottone: {
+  ricercaInput: {
     flex: 1,
-    borderRadius: 8,
-    paddingVertical: 10,
-    alignItems: 'center',
+    fontSize: 15,
+    fontFamily: FONT.regolare,
+    paddingVertical: 0,
   },
-  bottoneTesto: { fontSize: 13, fontWeight: '700' },
+
+  filtriContenitore: { marginHorizontal: -20 },
+  filtri: { gap: 8, paddingHorizontal: 20 },
+  filtro: {
+    height: 36,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    borderWidth: 1,
+    justifyContent: 'center',
+  },
+  filtroTesto: { fontSize: 13, fontFamily: FONT.semi },
+
+  titoloPeriodo: {
+    fontSize: 13,
+    fontFamily: FONT.grassetto,
+    paddingTop: 18,
+    paddingBottom: 8,
+  },
+
+  riga: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    marginBottom: 10,
+  },
+  rigaTesti: { flex: 1, minWidth: 0, gap: 3 },
+  rigaNumero: {
+    fontSize: 12,
+    fontFamily: FONT.pieno,
+    fontVariant: ['tabular-nums'],
+  },
+  rigaOggetto: { fontSize: 16, fontFamily: FONT.grassetto },
+  rigaCliente: { fontSize: 13, fontFamily: FONT.regolare },
+  rigaDestra: { alignItems: 'flex-end', gap: 6 },
+  rigaImporto: {
+    fontSize: 16,
+    fontFamily: FONT.pieno,
+    fontVariant: ['tabular-nums'],
+  },
+  barrato: { textDecorationLine: 'line-through' },
+  badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
+  badgeTesto: { fontSize: 11, fontFamily: FONT.grassetto },
 
   vuoto: { marginTop: 48 },
-  vuotoTesto: { textAlign: 'center', fontSize: 15, lineHeight: 22 },
+  vuotoTesto: {
+    textAlign: 'center',
+    fontSize: 15,
+    lineHeight: 22,
+    fontFamily: FONT.regolare,
+  },
 
   fab: {
     position: 'absolute',
-    right: 24,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    right: 20,
+    bottom: 20,
+    width: 60,
+    height: 60,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    boxShadow: '0px 4px 12px rgba(217, 119, 6, 0.45)',
-  },
-  fabTesto: {
-    color: '#FFFFFF',
-    fontSize: 30,
-    fontWeight: '600',
-    marginTop: -2,
+    boxShadow: '0px 8px 20px rgba(7, 21, 34, 0.3)',
   },
 
   premuto: { opacity: 0.85, transform: [{ scale: 0.98 }] },

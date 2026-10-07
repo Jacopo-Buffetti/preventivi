@@ -1,15 +1,53 @@
+import {
+  Archivo_400Regular,
+  Archivo_500Medium,
+  Archivo_600SemiBold,
+  Archivo_700Bold,
+  Archivo_800ExtraBold,
+  useFonts,
+} from '@expo-google-fonts/archivo';
+import { Feather } from '@expo/vector-icons';
 import type { Session } from '@supabase/supabase-js';
 import { Tabs } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+import { useEffect, useState, type ComponentProps } from 'react';
+import {
+  ActivityIndicator,
+  StyleSheet,
+  Text,
+  View,
+  type ColorValue,
+} from 'react-native';
 import { SchermataLogin } from '../components/auth/SchermataLogin';
-import { useTema } from '../constants/tema';
+import { FONT, ProviderTema, useSceltaTema, useTema } from '../constants/tema';
 import { initDatabase } from '../services/db';
 import { supabase } from '../services/supabase';
 import { avviaSincronizzazioneAutomatica } from '../services/syncAutomatico';
 
+// Il provider del tema deve stare SOPRA a tutto il resto: per questo il
+// layout vero e proprio è un componente a parte, renderizzato dentro.
 export default function RootLayout() {
+  return (
+    <ProviderTema>
+      <LayoutApp />
+    </ProviderTema>
+  );
+}
+
+function LayoutApp() {
   const t = useTema();
+  const { nome } = useSceltaTema();
+
+  // Carattere Archivo: i pesi usati nell'app (vedi FONT in tema.ts).
+  // Se il caricamento fallisce si prosegue con il carattere di sistema.
+  const [fontCaricati, erroreFont] = useFonts({
+    Archivo_400Regular,
+    Archivo_500Medium,
+    Archivo_600SemiBold,
+    Archivo_700Bold,
+    Archivo_800ExtraBold,
+  });
+  const fontPronti = fontCaricati || !!erroreFont;
   const [dbPronto, setDbPronto] = useState(false);
   const [erroreDb, setErroreDb] = useState<string | null>(null);
 
@@ -61,15 +99,19 @@ export default function RootLayout() {
   if (erroreDb) {
     return (
       <View style={[styles.centro, { backgroundColor: t.sfondo }]}>
-        <Text style={[styles.titolo, { color: t.testo }]}>Impossibile aprire il database</Text>
-        <Text style={[styles.dettaglio, { color: t.testoSecondario }]}>{erroreDb}</Text>
+        <Text style={[styles.titolo, { color: t.testo }]}>
+          Impossibile aprire il database
+        </Text>
+        <Text style={[styles.dettaglio, { color: t.testoSecondario }]}>
+          {erroreDb}
+        </Text>
       </View>
     );
   }
 
   // Le schermate vengono montate solo quando le tabelle esistono già
   // e sappiamo se c'è un utente collegato
-  if (!dbPronto || !authPronta) {
+  if (!dbPronto || !authPronta || !fontPronti) {
     return (
       <View style={[styles.centro, { backgroundColor: t.sfondo }]}>
         <ActivityIndicator size="large" color={t.accento} />
@@ -79,58 +121,129 @@ export default function RootLayout() {
 
   // Nessun utente collegato su questo dispositivo: chiediamo il login
   if (!sessione) {
-    return <SchermataLogin />;
+    return (
+      <>
+        <StatusBar style={nome === 'dark' ? 'light' : 'dark'} />
+        <SchermataLogin />
+      </>
+    );
   }
 
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: t.accento,
-        tabBarInactiveTintColor: t.testoSecondario,
-        tabBarStyle: { backgroundColor: t.card, borderTopColor: t.bordo },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '700' },
-        sceneStyle: { backgroundColor: t.sfondo },
-      }}
-    >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ focused }) => <IconaTab emoji="🏠" attiva={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="preventivi"
-        options={{
-          title: 'Preventivi',
-          tabBarIcon: ({ focused }) => <IconaTab emoji="📄" attiva={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="clienti"
-        options={{
-          title: 'Clienti',
-          tabBarIcon: ({ focused }) => <IconaTab emoji="👥" attiva={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="biglietto/index"
-        options={{
-          title: 'Biglietto',
-          tabBarIcon: ({ focused }) => <IconaTab emoji="📇" attiva={focused} />,
-        }}
-      />
+    <>
+      {/* Barra di stato del telefono (ora, batteria): testo chiaro sul tema
+          scuro, scuro sul tema chiaro. Le schermate con intestazione blu
+          notte la sovrascrivono mentre sono visibili. */}
+      <StatusBar style={nome === 'dark' ? 'light' : 'dark'} />
 
-      {/* Il profilo si apre dalla home ma non ha una scheda nella barra */}
-      <Tabs.Screen name="profilo/index" options={{ href: null }} />
-    </Tabs>
+      <Tabs
+        screenOptions={{
+          headerShown: false,
+          tabBarActiveTintColor: t.tabAttiva,
+          tabBarInactiveTintColor: t.testoSecondario,
+          tabBarStyle: { backgroundColor: t.barraTab, borderTopColor: t.bordo },
+          tabBarLabelStyle: { fontSize: 11, fontFamily: FONT.semi },
+          sceneStyle: { backgroundColor: t.sfondo },
+        }}
+      >
+        <Tabs.Screen
+          name="index"
+          options={{
+            title: 'Home',
+            tabBarIcon: ({ focused, color }) => (
+              <IconaTab
+                nome="home"
+                attiva={focused}
+                colore={color}
+                ottone={t.ottone}
+              />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="preventivi"
+          options={{
+            title: 'Preventivi',
+            tabBarIcon: ({ focused, color }) => (
+              <IconaTab
+                nome="file-text"
+                attiva={focused}
+                colore={color}
+                ottone={t.ottone}
+              />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="clienti"
+          options={{
+            title: 'Clienti',
+            tabBarIcon: ({ focused, color }) => (
+              <IconaTab
+                nome="users"
+                attiva={focused}
+                colore={color}
+                ottone={t.ottone}
+              />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="biglietto/index"
+          options={{
+            title: 'Biglietto',
+            tabBarIcon: ({ focused, color }) => (
+              <IconaTab
+                nome="credit-card"
+                attiva={focused}
+                colore={color}
+                ottone={t.ottone}
+              />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="profilo/index"
+          options={{
+            title: 'Profilo',
+            tabBarIcon: ({ focused, color }) => (
+              <IconaTab
+                nome="user"
+                attiva={focused}
+                colore={color}
+                ottone={t.ottone}
+              />
+            ),
+          }}
+        />
+      </Tabs>
+    </>
   );
 }
 
-// Le emoji non si possono colorare: la scheda inattiva viene resa più trasparente
-function IconaTab({ emoji, attiva }: { emoji: string; attiva: boolean }) {
-  return <Text style={[styles.icona, { opacity: attiva ? 1 : 0.45 }]}>{emoji}</Text>;
+// Icona della barra in basso: icona a linea (Feather) e, sulla scheda
+// attiva, una lineetta color ottone sopra, come nel disegno
+type NomeIcona = ComponentProps<typeof Feather>['name'];
+
+function IconaTab({
+  nome,
+  attiva,
+  colore,
+  ottone,
+}: {
+  nome: NomeIcona;
+  attiva: boolean;
+  colore: ColorValue;
+  ottone: string;
+}) {
+  return (
+    <View style={styles.iconaTab}>
+      {attiva && (
+        <View style={[styles.lineettaAttiva, { backgroundColor: ottone }]} />
+      )}
+      <Feather name={nome} size={22} color={colore} />
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -150,5 +263,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
   },
-  icona: { fontSize: 20 },
+  iconaTab: { alignItems: 'center', justifyContent: 'center' },
+  lineettaAttiva: {
+    position: 'absolute',
+    top: -9,
+    width: 26,
+    height: 3,
+    borderBottomLeftRadius: 3,
+    borderBottomRightRadius: 3,
+  },
 });

@@ -1,5 +1,12 @@
+import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { StatusBar } from 'expo-status-bar';
+import {
+  useCallback,
+  useState,
+  type ComponentProps,
+  type ReactNode,
+} from 'react';
 import {
   ActivityIndicator,
   Linking,
@@ -10,8 +17,15 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { STATI } from '../../constants/stati';
-import { useTema, type Tema } from '../../constants/tema';
+import { coloriStato, ETICHETTE_STATO } from '../../constants/stati';
+import {
+  FONT,
+  useSceltaTema,
+  useTema,
+  type NomeTema,
+  type Tema,
+} from '../../constants/tema';
+import { useCaricaQuandoVisibile } from '../../hooks/useCaricaQuandoVisibile';
 import {
   deleteCliente,
   getClienteById,
@@ -21,58 +35,52 @@ import {
 } from '../../services/databaseService';
 import { avviso, conferma } from '../../utils/dialoghi';
 import {
-  formattaData,
   formattaEuro,
   formattaNumeroPreventivo,
+  iniziali,
+  numeroWhatsApp,
 } from '../../utils/formato';
 
-// "Mario Rossi" → "MR"
-function iniziali(nome: string): string {
-  const parole = nome.trim().split(/\s+/).filter(Boolean);
-  const lettere =
-    parole.length > 1
-      ? parole[0][0] + parole[parole.length - 1][0]
-      : (parole[0]?.slice(0, 2) ?? '?');
-  return lettere.toUpperCase();
-}
-
-// Numero per wa.me: solo cifre, con prefisso internazionale (39 se manca)
-function numeroWhatsApp(telefono: string): string {
-  let cifre = telefono.replace(/[^\d+]/g, '');
-  if (cifre.startsWith('+')) cifre = cifre.slice(1);
-  else if (cifre.startsWith('00')) cifre = cifre.slice(2);
-  else if (cifre.length === 10 && cifre.startsWith('3')) cifre = '39' + cifre;
-  return cifre.replace(/\D/g, '');
-}
+type NomeIcona = ComponentProps<typeof Feather>['name'];
 
 export default function DettaglioClienteScreen() {
   const { idCliente } = useLocalSearchParams<{ idCliente: string }>();
   const router = useRouter();
   const t = useTema();
+  const { nome: nomeTema } = useSceltaTema();
   const insets = useSafeAreaInsets();
 
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [preventivi, setPreventivi] = useState<Preventivo[]>([]);
   const [caricamento, setCaricamento] = useState(true);
 
+  // Intestazione blu notte: ora e batteria del telefono in chiaro
+  const [inVista, setInVista] = useState(false);
   useFocusEffect(
     useCallback(() => {
-      if (!idCliente) return;
-      Promise.all([
-        getClienteById(idCliente),
-        getPreventiviByClienteId(idCliente),
-      ])
-        .then(([c, p]) => {
-          setCliente(c);
-          setPreventivi(p);
-        })
-        .catch((err) => {
-          console.error(err);
-          avviso('Errore', 'Impossibile caricare i dati del cliente.');
-        })
-        .finally(() => setCaricamento(false));
-    }, [idCliente])
+      setInVista(true);
+      return () => setInVista(false);
+    }, [])
   );
+
+  // Si ricarica quando torna visibile e quando la sincronizzazione porta
+  // dati nuovi (es. il cliente modificato su un altro dispositivo)
+  useCaricaQuandoVisibile(() => {
+    if (!idCliente) return;
+    Promise.all([
+      getClienteById(idCliente),
+      getPreventiviByClienteId(idCliente),
+    ])
+      .then(([c, p]) => {
+        setCliente(c);
+        setPreventivi(p);
+      })
+      .catch((err) => {
+        console.error(err);
+        avviso('Errore', 'Impossibile caricare i dati del cliente.');
+      })
+      .finally(() => setCaricamento(false));
+  });
 
   // Se si arriva qui da un link diretto non c'è una pagina a cui tornare
   const tornaAllaRubrica = () => {
@@ -104,7 +112,7 @@ export default function DettaglioClienteScreen() {
   const elimina = async () => {
     if (!cliente) return;
 
-    // Un cliente con preventivi non si può eliminare (il database lo impedisce)
+    // Un cliente con preventivi non si può eliminare
     if (preventivi.length > 0) {
       avviso(
         'Impossibile eliminare',
@@ -117,7 +125,7 @@ export default function DettaglioClienteScreen() {
 
     const ok = await conferma(
       'Eliminare il contatto?',
-      `${cliente.nome} verrà eliminato definitivamente dalla rubrica.`,
+      `${cliente.nome} verrà eliminato dalla rubrica.`,
       'Elimina',
       true
     );
@@ -136,7 +144,7 @@ export default function DettaglioClienteScreen() {
   if (caricamento) {
     return (
       <View style={[styles.centro, { backgroundColor: t.sfondo }]}>
-        <ActivityIndicator color={t.accento} size="large" />
+        <ActivityIndicator color={t.ottone} size="large" />
       </View>
     );
   }
@@ -148,17 +156,18 @@ export default function DettaglioClienteScreen() {
           Cliente non trovato
         </Text>
         <Text style={[styles.testoVuoto, { color: t.testoSecondario }]}>
-          Potrebbe essere stato eliminato.
+          Potrebbe essere stato eliminato su questo o su un altro dispositivo.
         </Text>
         <Pressable
           onPress={() => router.replace('/clienti')}
-          style={[
-            styles.bottoneContorno,
+          style={({ pressed }) => [
+            styles.contorno,
             { borderColor: t.bordo, marginTop: 20 },
+            pressed && styles.premuto,
           ]}
           accessibilityRole="button"
         >
-          <Text style={[styles.bottoneContornoTesto, { color: t.testo }]}>
+          <Text style={[styles.contornoTesto, { color: t.testo }]}>
             Torna alla rubrica
           </Text>
         </Pressable>
@@ -166,299 +175,316 @@ export default function DettaglioClienteScreen() {
     );
   }
 
-  const totaleAccettati = preventivi
+  const telefono = (cliente.telefono ?? '').replace(/\s/g, '');
+  const whatsapp = numeroWhatsApp(cliente.telefono ?? '');
+  const valoreAccettato = preventivi
     .filter((p) => p.stato === 'accettato')
     .reduce((somma, p) => somma + p.totale_generale, 0);
 
   return (
     <View style={[styles.container, { backgroundColor: t.sfondo }]}>
-      {/* Barra superiore: resta sotto la barra di stato del telefono */}
-      <View style={[styles.barra, { paddingTop: insets.top + 12 }]}>
-        <Pressable
-          onPress={tornaAllaRubrica}
-          hitSlop={12}
-          accessibilityRole="button"
-        >
-          <Text style={[styles.indietro, { color: t.testoSecondario }]}>
-            ‹ Clienti
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={modifica}
-          style={({ pressed }) => [
-            styles.pillModifica,
-            { backgroundColor: t.card, borderColor: t.bordo },
-            pressed && styles.premuto,
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel="Modifica contatto"
-        >
-          <Text style={[styles.pillModificaTesto, { color: t.accento }]}>
-            ✎ Modifica
-          </Text>
-        </Pressable>
-      </View>
+      {inVista && <StatusBar style="light" />}
 
-      <ScrollView
-        contentContainerStyle={[styles.contenuto, { paddingBottom: 32 }]}
-      >
-        {/* Testata con avatar */}
+      <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
+        {/* --- INTESTAZIONE --- */}
         <View
           style={[
-            styles.hero,
-            { backgroundColor: t.card, borderColor: t.bordo },
+            styles.intestazione,
+            { backgroundColor: t.intestazione, paddingTop: insets.top + 8 },
           ]}
         >
-          <View style={styles.heroRiga}>
-            <View
-              style={[
-                styles.avatar,
-                { backgroundColor: 'rgba(245,158,11,0.15)' },
+          <View style={styles.barra}>
+            <Pressable
+              onPress={tornaAllaRubrica}
+              hitSlop={8}
+              accessibilityRole="button"
+              style={styles.indietro}
+            >
+              <Feather
+                name="chevron-left"
+                size={22}
+                color={t.testoIntestazioneSecondario}
+              />
+              <Text
+                style={[
+                  styles.indietroTesto,
+                  { color: t.testoIntestazioneSecondario },
+                ]}
+              >
+                Clienti
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={modifica}
+              accessibilityRole="button"
+              accessibilityLabel="Modifica contatto"
+              style={({ pressed }) => [
+                styles.pulsanteIcona,
+                { backgroundColor: t.riquadroIntestazione },
+                pressed && styles.premuto,
               ]}
             >
-              <Text style={[styles.avatarTesto, { color: t.accento }]}>
+              <Feather name="edit-3" size={20} color={t.testoIntestazione} />
+            </Pressable>
+          </View>
+
+          <View style={styles.identita}>
+            <View
+              style={[styles.avatar, { backgroundColor: t.bottonePrimario }]}
+            >
+              <Text style={[styles.avatarTesto, { color: t.testoSuPrimario }]}>
                 {iniziali(cliente.nome)}
               </Text>
             </View>
-            <View style={styles.heroTesti}>
-              <Text style={[styles.nome, { color: t.testo }]} numberOfLines={2}>
+            <View style={styles.identitaTesti}>
+              <Text
+                style={[styles.nome, { color: t.testoIntestazione }]}
+                numberOfLines={2}
+              >
                 {cliente.nome}
               </Text>
               {!!cliente.indirizzo && (
                 <Text
-                  style={[styles.sottotitolo, { color: t.testoSecondario }]}
+                  style={[
+                    styles.indirizzo,
+                    { color: t.testoIntestazioneSecondario },
+                  ]}
                   numberOfLines={2}
                 >
-                  📍 {cliente.indirizzo}
+                  {cliente.indirizzo}
                 </Text>
               )}
             </View>
           </View>
 
-          {/* Azioni rapide */}
+          {/* Azioni rapide: disattivate se manca il dato */}
           <View style={styles.azioniRapide}>
             <AzioneRapida
-              icona="📞"
-              etichetta="Chiama"
               t={t}
-              attiva={!!cliente.telefono}
-              onPress={() =>
-                apri(`tel:${cliente.telefono!.replace(/\s/g, '')}`)
-              }
+              icona="phone"
+              testo="Chiama"
+              attiva={!!telefono}
+              onPress={() => apri(`tel:${telefono}`)}
             />
             <AzioneRapida
-              icona="💬"
-              etichetta="WhatsApp"
               t={t}
-              attiva={!!cliente.telefono}
-              onPress={() =>
-                apri(`https://wa.me/${numeroWhatsApp(cliente.telefono!)}`)
-              }
+              icona="message-circle"
+              testo="WhatsApp"
+              attiva={!!whatsapp}
+              onPress={() => apri(`https://wa.me/${whatsapp}`)}
             />
             <AzioneRapida
-              icona="✉️"
-              etichetta="Email"
               t={t}
+              icona="mail"
+              testo="Email"
               attiva={!!cliente.email}
               onPress={() => apri(`mailto:${cliente.email}`)}
             />
           </View>
         </View>
 
-        {/* Dati del contatto */}
-        <Etichetta testo="CONTATTI" t={t} />
-        <View
-          style={[
-            styles.card,
-            { backgroundColor: t.card, borderColor: t.bordo },
-          ]}
-        >
-          <RigaInfo etichetta="Telefono" valore={cliente.telefono} t={t} />
-          <RigaInfo etichetta="Email" valore={cliente.email} t={t} />
-          <RigaInfo
-            etichetta="Indirizzo"
-            valore={cliente.indirizzo}
+        <View style={styles.corpo}>
+          {/* --- CONTATTI --- */}
+          <Sezione t={t} titolo="Contatti">
+            <View
+              style={[
+                styles.card,
+                { backgroundColor: t.card, borderColor: t.bordo },
+              ]}
+            >
+              <RigaInfo
+                t={t}
+                icona="phone"
+                etichetta="Telefono"
+                valore={cliente.telefono}
+              />
+              <RigaInfo
+                t={t}
+                icona="mail"
+                etichetta="Email"
+                valore={cliente.email}
+              />
+              <RigaInfo
+                t={t}
+                icona="map-pin"
+                etichetta="Indirizzo"
+                valore={cliente.indirizzo}
+                ultima={!cliente.note}
+              />
+              {!!cliente.note && (
+                <RigaInfo
+                  t={t}
+                  icona="file-text"
+                  etichetta="Note"
+                  valore={cliente.note}
+                  ultima
+                />
+              )}
+            </View>
+          </Sezione>
+
+          {/* --- PREVENTIVI --- */}
+          <Sezione
             t={t}
-            ultima={!cliente.note}
-          />
-          {!!cliente.note && (
-            <RigaInfo etichetta="Note" valore={cliente.note} t={t} ultima />
-          )}
-        </View>
-
-        {/* Preventivi */}
-        <View style={styles.intestazioneSezione}>
-          <Text
-            style={[
-              styles.etichetta,
-              styles.senzaMargine,
-              { color: t.testoSecondario },
-            ]}
+            titolo="Preventivi"
+            dettaglio={
+              valoreAccettato > 0
+                ? `${formattaEuro(valoreAccettato)} accettati`
+                : undefined
+            }
+            coloreDettaglio={t.successo}
           >
-            PREVENTIVI ({preventivi.length})
-          </Text>
-          {totaleAccettati > 0 && (
-            <Text style={[styles.accettati, { color: '#22C55E' }]}>
-              Accettati: {formattaEuro(totaleAccettati)}
-            </Text>
-          )}
-        </View>
-
-        {preventivi.length === 0 ? (
-          <View
-            style={[
-              styles.card,
-              styles.vuotoCard,
-              { backgroundColor: t.card, borderColor: t.bordo },
-            ]}
-          >
-            <Text style={[styles.testoVuoto, { color: t.testoSecondario }]}>
-              Nessun preventivo per questo cliente.
-            </Text>
-          </View>
-        ) : (
-          preventivi.map((p) => {
-            const stato = STATI[p.stato] ?? STATI.bozza;
-            return (
-              <Pressable
-                key={p.id}
-                onPress={() =>
-                  router.push({
-                    pathname: '/preventivi/[idPreventivo]',
-                    params: { idPreventivo: p.id },
-                  })
-                }
-                style={({ pressed }) => [
-                  styles.preventivo,
+            {preventivi.length > 0 && (
+              <View
+                style={[
+                  styles.card,
                   { backgroundColor: t.card, borderColor: t.bordo },
-                  pressed && styles.premuto,
                 ]}
-                accessibilityRole="button"
               >
-                <View style={styles.preventivoTesta}>
-                  <Text style={[styles.preventivoNumero, { color: t.testo }]}>
-                    N° {formattaNumeroPreventivo(p.anno, p.numero_preventivo)}
-                  </Text>
-                  <View
-                    style={[
-                      styles.badge,
-                      {
-                        backgroundColor: stato.sfondo,
-                        borderColor: stato.colore,
-                      },
-                    ]}
-                  >
-                    <Text style={[styles.badgeTesto, { color: stato.colore }]}>
-                      {stato.etichetta}
-                    </Text>
-                  </View>
-                </View>
-                {!!p.oggetto && (
-                  <Text
-                    style={[styles.preventivoOggetto, { color: t.testo }]}
-                    numberOfLines={1}
-                  >
-                    {p.oggetto}
-                  </Text>
-                )}
-                <View style={styles.preventivoPiede}>
-                  <Text
-                    style={[
-                      styles.preventivoData,
-                      { color: t.testoSecondario },
-                    ]}
-                  >
-                    {formattaData(p.data_creazione)}
-                  </Text>
-                  <Text style={[styles.preventivoTotale, { color: t.accento }]}>
-                    {formattaEuro(p.totale_generale)}
-                  </Text>
-                </View>
-              </Pressable>
-            );
-          })
-        )}
+                {preventivi.map((p, i) => (
+                  <RigaPreventivo
+                    key={p.id}
+                    p={p}
+                    t={t}
+                    nomeTema={nomeTema}
+                    ultima={i === preventivi.length - 1}
+                    onApri={() =>
+                      router.push({
+                        pathname: '/preventivi/[idPreventivo]',
+                        params: { idPreventivo: p.id },
+                      })
+                    }
+                  />
+                ))}
+              </View>
+            )}
 
-        {/* Azioni */}
-        <Pressable
-          onPress={nuovoPreventivo}
-          style={({ pressed }) => [
-            styles.bottonePrimario,
-            { backgroundColor: t.bottonePrimario },
-            pressed && styles.premuto,
-          ]}
-          accessibilityRole="button"
-        >
-          <Text style={styles.bottonePrimarioTesto}>
-            ＋ Nuovo preventivo per questo cliente
-          </Text>
-        </Pressable>
+            <Pressable
+              onPress={nuovoPreventivo}
+              style={({ pressed }) => [
+                styles.pulsantePrincipale,
+                { backgroundColor: t.bottonePrimario },
+                pressed && styles.premuto,
+              ]}
+              accessibilityRole="button"
+            >
+              <Feather name="plus" size={20} color={t.testoSuPrimario} />
+              <Text
+                style={[
+                  styles.pulsantePrincipaleTesto,
+                  { color: t.testoSuPrimario },
+                ]}
+              >
+                {preventivi.length === 0
+                  ? 'Primo preventivo per questo cliente'
+                  : 'Nuovo preventivo'}
+              </Text>
+            </Pressable>
+          </Sezione>
 
-        <Pressable
-          onPress={elimina}
-          style={({ pressed }) => [styles.elimina, pressed && { opacity: 0.6 }]}
-          accessibilityRole="button"
-        >
-          <Text style={[styles.eliminaTesto, { color: t.pericolo }]}>
-            Elimina contatto
-          </Text>
-        </Pressable>
+          <Pressable
+            onPress={elimina}
+            style={({ pressed }) => [
+              styles.elimina,
+              pressed && { opacity: 0.6 },
+            ]}
+            accessibilityRole="button"
+          >
+            <Text style={[styles.eliminaTesto, { color: t.pericolo }]}>
+              Elimina contatto
+            </Text>
+          </Pressable>
+        </View>
       </ScrollView>
     </View>
   );
 }
 
-// --- Componenti di supporto ---
+// --- COMPONENTI ---------------------------------------------------------------
 
-function Etichetta({ testo, t }: { testo: string; t: Tema }) {
+function Sezione({
+  t,
+  titolo,
+  dettaglio,
+  coloreDettaglio,
+  children,
+}: {
+  t: Tema;
+  titolo: string;
+  dettaglio?: string;
+  coloreDettaglio?: string;
+  children: ReactNode;
+}) {
   return (
-    <Text style={[styles.etichetta, { color: t.testoSecondario }]}>
-      {testo}
-    </Text>
+    <View style={styles.sezione}>
+      <View style={styles.testaSezione}>
+        <Text
+          style={[styles.titoloSezione, { color: t.testo }]}
+          accessibilityRole="header"
+        >
+          {titolo}
+        </Text>
+        {!!dettaglio && (
+          <Text
+            style={[
+              styles.dettaglioSezione,
+              { color: coloreDettaglio ?? t.testoSecondario },
+            ]}
+          >
+            {dettaglio}
+          </Text>
+        )}
+      </View>
+      {children}
+    </View>
   );
 }
 
 function AzioneRapida({
+  t,
   icona,
-  etichetta,
+  testo,
   attiva,
   onPress,
-  t,
 }: {
-  icona: string;
-  etichetta: string;
+  t: Tema;
+  icona: NomeIcona;
+  testo: string;
   attiva: boolean;
   onPress: () => void;
-  t: Tema;
 }) {
   return (
     <Pressable
       onPress={onPress}
       disabled={!attiva}
-      style={({ pressed }) => [
-        styles.azione,
-        { backgroundColor: t.sfondo, borderColor: t.bordo },
-        !attiva && styles.disattivata,
-        pressed && styles.premuto,
-      ]}
       accessibilityRole="button"
       accessibilityState={{ disabled: !attiva }}
+      style={({ pressed }) => [
+        styles.azioneRapida,
+        { backgroundColor: t.riquadroIntestazione },
+        !attiva && styles.spenta,
+        pressed && styles.premuto,
+      ]}
     >
-      <Text style={styles.azioneIcona}>{icona}</Text>
-      <Text style={[styles.azioneTesto, { color: t.testo }]}>{etichetta}</Text>
+      <Feather name={icona} size={20} color={t.bottonePrimario} />
+      <Text style={[styles.azioneRapidaTesto, { color: t.testoIntestazione }]}>
+        {testo}
+      </Text>
     </Pressable>
   );
 }
 
 function RigaInfo({
+  t,
+  icona,
   etichetta,
   valore,
-  t,
   ultima,
 }: {
+  t: Tema;
+  icona: NomeIcona;
   etichetta: string;
   valore?: string;
-  t: Tema;
   ultima?: boolean;
 }) {
   return (
@@ -468,23 +494,80 @@ function RigaInfo({
         !ultima && { borderBottomWidth: 1, borderBottomColor: t.bordo },
       ]}
     >
-      <Text style={[styles.rigaEtichetta, { color: t.testoSecondario }]}>
-        {etichetta}
-      </Text>
-      <Text
-        style={[
-          styles.rigaValore,
-          { color: valore ? t.testo : t.testoSecondario },
-        ]}
-        selectable
-      >
-        {valore || '—'}
-      </Text>
+      <Feather
+        name={icona}
+        size={18}
+        color={t.testoSecondario}
+        style={styles.iconaInfo}
+      />
+      <View style={styles.testiInfo}>
+        <Text style={[styles.etichettaInfo, { color: t.testoSecondario }]}>
+          {etichetta}
+        </Text>
+        <Text
+          style={[
+            styles.valoreInfo,
+            { color: valore ? t.testo : t.testoSecondario },
+            !valore && styles.mancante,
+          ]}
+        >
+          {valore || 'Non inserito'}
+        </Text>
+      </View>
     </View>
   );
 }
 
-// --- Stili ---
+function RigaPreventivo({
+  p,
+  t,
+  nomeTema,
+  ultima,
+  onApri,
+}: {
+  p: Preventivo;
+  t: Tema;
+  nomeTema: NomeTema;
+  ultima: boolean;
+  onApri: () => void;
+}) {
+  const stato = coloriStato(p.stato, nomeTema);
+  const bozza = p.numero_preventivo === null;
+  return (
+    <Pressable
+      onPress={onApri}
+      accessibilityRole="button"
+      style={({ pressed }) => [
+        styles.rigaPreventivo,
+        !ultima && { borderBottomWidth: 1, borderBottomColor: t.bordo },
+        pressed && { backgroundColor: t.riquadro },
+      ]}
+    >
+      <View style={styles.testiInfo}>
+        <Text style={[styles.numero, { color: t.testoSecondario }]}>
+          {bozza
+            ? 'Bozza'
+            : `N. ${formattaNumeroPreventivo(p.anno, p.numero_preventivo)}`}
+        </Text>
+        <Text style={[styles.oggetto, { color: t.testo }]} numberOfLines={1}>
+          {p.oggetto?.trim() || 'Senza oggetto'}
+        </Text>
+      </View>
+      <View style={styles.colonnaDestra}>
+        <Text style={[styles.importo, { color: t.testo }]}>
+          {formattaEuro(p.totale_generale)}
+        </Text>
+        <View style={[styles.badge, { backgroundColor: stato.sfondo }]}>
+          <Text style={[styles.badgeTesto, { color: stato.colore }]}>
+            {ETICHETTE_STATO[p.stato]}
+          </Text>
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
+// --- STILI ------------------------------------------------------------------
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
@@ -494,139 +577,149 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
   },
-  titoloVuoto: { fontSize: 18, fontWeight: '800' },
-  testoVuoto: { fontSize: 14, marginTop: 6, textAlign: 'center' },
+  titoloVuoto: { fontSize: 20, fontFamily: FONT.pieno, textAlign: 'center' },
+  testoVuoto: {
+    fontSize: 14,
+    fontFamily: FONT.regolare,
+    textAlign: 'center',
+    marginTop: 6,
+  },
+  contorno: {
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  contornoTesto: { fontSize: 14, fontFamily: FONT.grassetto },
 
+  intestazione: {
+    paddingHorizontal: 20,
+    paddingBottom: 22,
+    gap: 18,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+  },
   barra: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingBottom: 10,
-    width: '100%',
-    maxWidth: 720,
-    alignSelf: 'center',
   },
-  indietro: { fontSize: 15, fontWeight: '600' },
-  pillModifica: {
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
+  indietro: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    height: 44,
+    paddingRight: 8,
   },
-  pillModificaTesto: { fontSize: 14, fontWeight: '700' },
-
-  contenuto: {
-    paddingHorizontal: 16,
-    width: '100%',
-    maxWidth: 720,
-    alignSelf: 'center',
-  },
-
-  hero: { borderWidth: 1, borderRadius: 18, padding: 16 },
-  heroRiga: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+  indietroTesto: { fontSize: 15, fontFamily: FONT.semi },
+  pulsanteIcona: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarTesto: { fontSize: 20, fontWeight: '800' },
-  heroTesti: { flex: 1 },
-  nome: { fontSize: 22, fontWeight: '800', letterSpacing: -0.3 },
-  sottotitolo: { fontSize: 14, marginTop: 4 },
 
-  azioniRapide: { flexDirection: 'row', gap: 8, marginTop: 16 },
-  azione: {
-    flex: 1,
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingVertical: 12,
+  identita: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  avatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
     alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarTesto: { fontSize: 20, fontFamily: FONT.pieno },
+  identitaTesti: { flex: 1, minWidth: 0, gap: 4 },
+  nome: {
+    fontSize: 26,
+    lineHeight: 31,
+    fontFamily: FONT.pieno,
+    letterSpacing: -0.4,
+  },
+  indirizzo: { fontSize: 14, fontFamily: FONT.regolare },
+
+  azioniRapide: { flexDirection: 'row', gap: 8 },
+  azioneRapida: {
+    flex: 1,
+    height: 64,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 4,
   },
-  azioneIcona: { fontSize: 20 },
-  azioneTesto: { fontSize: 12, fontWeight: '700' },
-  disattivata: { opacity: 0.35 },
+  azioneRapidaTesto: { fontSize: 12, fontFamily: FONT.grassetto },
+  spenta: { opacity: 0.35 },
 
-  etichetta: {
+  corpo: {
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    gap: 24,
+    width: '100%',
+    maxWidth: 720,
+    alignSelf: 'center',
+  },
+  sezione: { gap: 10 },
+  testaSezione: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  titoloSezione: { fontSize: 16, fontFamily: FONT.pieno },
+  dettaglioSezione: { fontSize: 13, fontFamily: FONT.grassetto },
+
+  card: { borderRadius: 18, borderWidth: 1, overflow: 'hidden' },
+  rigaInfo: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  iconaInfo: { marginTop: 2 },
+  testiInfo: { flex: 1, minWidth: 0, gap: 2 },
+  etichettaInfo: { fontSize: 12, fontFamily: FONT.semi },
+  valoreInfo: { fontSize: 15, fontFamily: FONT.medio },
+  mancante: { fontFamily: FONT.regolare, fontStyle: 'italic' },
+
+  rigaPreventivo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  numero: {
     fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 0.4,
-    marginTop: 22,
-    marginBottom: 8,
+    fontFamily: FONT.pieno,
+    fontVariant: ['tabular-nums'],
   },
-  senzaMargine: { marginTop: 0, marginBottom: 0 },
+  oggetto: { fontSize: 15, fontFamily: FONT.grassetto },
+  colonnaDestra: { alignItems: 'flex-end', gap: 5 },
+  importo: {
+    fontSize: 15,
+    fontFamily: FONT.grassetto,
+    fontVariant: ['tabular-nums'],
+  },
+  badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
+  badgeTesto: { fontSize: 11, fontFamily: FONT.grassetto },
 
-  card: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14 },
-  rigaInfo: { paddingVertical: 12 },
-  rigaEtichetta: { fontSize: 12, fontWeight: '600' },
-  rigaValore: { fontSize: 15, marginTop: 2 },
-
-  intestazioneSezione: {
+  pulsantePrincipale: {
+    height: 56,
+    borderRadius: 16,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 22,
-    marginBottom: 8,
-  },
-  accettati: { fontSize: 12, fontWeight: '800' },
-  vuotoCard: { paddingVertical: 16 },
-
-  preventivo: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 10,
-  },
-  preventivoTesta: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    justifyContent: 'center',
     gap: 8,
   },
-  preventivoNumero: { fontSize: 16, fontWeight: '800' },
-  badge: {
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-  },
-  badgeTesto: { fontSize: 11, fontWeight: '800', letterSpacing: 0.4 },
-  preventivoOggetto: { fontSize: 14, fontWeight: '600', marginTop: 6 },
-  preventivoPiede: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 6,
-  },
-  preventivoData: { fontSize: 13 },
-  preventivoTotale: { fontSize: 15, fontWeight: '800' },
-
-  bottonePrimario: {
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  bottonePrimarioTesto: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
-
-  bottoneContorno: {
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-  },
-  bottoneContornoTesto: { fontSize: 15, fontWeight: '700' },
+  pulsantePrincipaleTesto: { fontSize: 16, fontFamily: FONT.pieno },
 
   elimina: {
     alignSelf: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    marginTop: 8,
+    height: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
   },
-  eliminaTesto: { fontSize: 14, fontWeight: '700' },
+  eliminaTesto: { fontSize: 14, fontFamily: FONT.grassetto },
 
   premuto: { opacity: 0.85, transform: [{ scale: 0.98 }] },
 });

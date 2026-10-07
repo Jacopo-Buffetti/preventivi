@@ -4,6 +4,7 @@ import * as Sharing from 'expo-sharing';
 import { Platform } from 'react-native';
 import { htmlBiglietto } from '../pdf/templateBiglietto';
 import type { Biglietto } from './bigliettoService';
+import { stampaSulWeb } from './pdfService';
 
 // Errore lanciato quando una finestra di condivisione è ancora aperta
 export const CONDIVISIONE_IN_CORSO = 'CONDIVISIONE_IN_CORSO';

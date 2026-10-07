@@ -1,15 +1,17 @@
-import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useRouter } from 'expo-router';
+import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
   Pressable,
+  RefreshControl,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useCaricaQuandoVisibile } from '../../hooks/useCaricaQuandoVisibile';
 import { STATI } from '../../constants/stati';
 import { useTema, type Tema } from '../../constants/tema';
 import {
@@ -17,7 +19,9 @@ import {
   type Preventivo,
 } from '../../services/databaseService';
 import { condividiPdfPreventivo } from '../../services/pdfService';
+import { useTiraPerAggiornare } from '../../services/syncAutomatico';
 import { avviso } from '../../utils/dialoghi';
+import { prontoPerInvio } from '../../utils/invioPreventivo';
 import {
   formattaData,
   formattaEuro,
@@ -39,18 +43,19 @@ export default function PreventiviScreen() {
   const [caricamento, setCaricamento] = useState(true);
   const [ricerca, setRicerca] = useState('');
 
+  const { aggiornando, aggiorna } = useTiraPerAggiornare();
+
   // Ricarica la lista ogni volta che la pagina torna visibile (es. dopo un salvataggio)
-  useFocusEffect(
-    useCallback(() => {
-      getAllPreventivi()
-        .then(setPreventivi)
-        .catch((err) => {
-          console.error(err);
-          avviso('Errore', 'Impossibile caricare i preventivi.');
-        })
-        .finally(() => setCaricamento(false));
-    }, [])
-  );
+  // e quando arrivano dati nuovi dalla sincronizzazione
+  useCaricaQuandoVisibile(() => {
+    getAllPreventivi()
+      .then(setPreventivi)
+      .catch((err) => {
+        console.error(err);
+        avviso('Errore', 'Impossibile caricare i preventivi.');
+      })
+      .finally(() => setCaricamento(false));
+  });
 
   const filtrati = useMemo(() => {
     const q = ricerca.trim().toLowerCase();
@@ -75,9 +80,15 @@ export default function PreventiviScreen() {
       params: { idPreventivo: p.id },
     });
 
+  // Condivisione rapida dalla lista: anche da qui una bozza deve prima
+  // ricevere il numero dal server, come dal dettaglio
   const condividiPdf = async (p: Preventivo) => {
     try {
-      await condividiPdfPreventivo(p.id);
+      const pronto = await prontoPerInvio(p);
+      if (!pronto) return;
+      // Aggiorna subito la riga in lista con numero e stato nuovi
+      setPreventivi((lista) => lista.map((x) => (x.id === pronto.id ? pronto : x)));
+      await condividiPdfPreventivo(pronto.id);
     } catch (err) {
       console.error(err);
       avviso('Errore', 'Impossibile generare il PDF del preventivo.');
@@ -91,6 +102,9 @@ export default function PreventiviScreen() {
       <FlatList
         data={filtrati}
         keyExtractor={(p) => p.id}
+        refreshControl={
+          <RefreshControl refreshing={aggiornando} onRefresh={aggiorna} tintColor={t.accento} />
+        }
         contentContainerStyle={[
           styles.lista,
           { paddingTop: insets.top + 24, paddingBottom: 100 },

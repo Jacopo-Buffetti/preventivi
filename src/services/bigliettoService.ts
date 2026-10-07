@@ -1,4 +1,5 @@
 import { adesso, getDbConnection } from './db';
+import { segnalaModificaLocale } from './eventiSync';
 
 export interface Biglietto {
   logo?: string; // immagine come data URI (data:image/...;base64,...)
@@ -17,10 +18,7 @@ export interface Biglietto {
 }
 
 // Campi che il biglietto deve avere per poter essere esportato
-export const CAMPI_OBBLIGATORI: {
-  campo: keyof Biglietto;
-  etichetta: string;
-}[] = [
+export const CAMPI_OBBLIGATORI: { campo: keyof Biglietto; etichetta: string }[] = [
   { campo: 'nome', etichetta: 'Nome attività' },
   { campo: 'indirizzo', etichetta: 'Indirizzo' },
   { campo: 'telefono', etichetta: 'Telefono' },
@@ -28,16 +26,18 @@ export const CAMPI_OBBLIGATORI: {
 ];
 
 export function campiMancanti(b: Biglietto): string[] {
-  return CAMPI_OBBLIGATORI.filter(
-    ({ campo }) => !String(b[campo] ?? '').trim()
-  ).map(({ etichetta }) => etichetta);
+  return CAMPI_OBBLIGATORI.filter(({ campo }) => !String(b[campo] ?? '').trim()).map(
+    ({ etichetta }) => etichetta
+  );
 }
 
 export async function getBiglietto(): Promise<Biglietto | null> {
   const db = await getDbConnection();
   const riga = await db.getFirstAsync<
     Biglietto & { id: number; updated_at?: string; da_sincronizzare?: number }
-  >('SELECT * FROM biglietto WHERE id = 1;');
+  >(
+    'SELECT * FROM biglietto WHERE id = 1;'
+  );
   if (!riga) return null;
   // Togliamo i campi tecnici: alle schermate interessano solo i dati del biglietto
   const { id: _id, updated_at: _u, da_sincronizzare: _d, ...biglietto } = riga;
@@ -69,4 +69,5 @@ export async function saveBiglietto(b: Biglietto): Promise<void> {
       adesso(),
     ]
   );
+  segnalaModificaLocale();
 }

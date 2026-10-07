@@ -1,7 +1,8 @@
-import { Link, useFocusEffect, type Href } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { Link, type Href } from 'expo-router';
+import { useState } from 'react';
 import {
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -9,7 +10,9 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useCaricaQuandoVisibile } from '../hooks/useCaricaQuandoVisibile';
 import { getProfiloFabbro } from '../services/databaseService';
+import { useTiraPerAggiornare } from '../services/syncAutomatico';
 
 // --- COLORI ---------------------------------------------------------------
 
@@ -114,19 +117,22 @@ export default function HomeScreen() {
   const [nomeAzienda, setNomeAzienda] = useState<string | null>(null);
   const [profiloCaricato, setProfiloCaricato] = useState(false);
 
+  const { aggiornando, aggiorna } = useTiraPerAggiornare();
+
   // Ricarica il nome ogni volta che si torna sulla home (es. dopo aver salvato il profilo)
-  useFocusEffect(
-    useCallback(() => {
-      getProfiloFabbro()
-        .then((profilo) => setNomeAzienda(profilo?.nome_azienda || null))
-        .catch(() => setNomeAzienda(null))
-        .finally(() => setProfiloCaricato(true));
-    }, [])
-  );
+  useCaricaQuandoVisibile(() => {
+    getProfiloFabbro()
+      .then((profilo) => setNomeAzienda(profilo?.nome_azienda || null))
+      .catch(() => setNomeAzienda(null))
+      .finally(() => setProfiloCaricato(true));
+  });
 
   return (
     <ScrollView
       style={{ backgroundColor: t.sfondo }}
+      refreshControl={
+        <RefreshControl refreshing={aggiornando} onRefresh={aggiorna} tintColor={t.accento} />
+      }
       contentContainerStyle={[
         styles.content,
         { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 32 },
@@ -173,18 +179,10 @@ export default function HomeScreen() {
         {/* Azione principale */}
         <View style={[styles.hero, { backgroundColor: t.hero }]}>
           <View
-            style={[
-              styles.decoro,
-              styles.decoroGrande,
-              { backgroundColor: t.accento },
-            ]}
+            style={[styles.decoro, styles.decoroGrande, { backgroundColor: t.accento }]}
           />
           <View
-            style={[
-              styles.decoro,
-              styles.decoroPiccolo,
-              { backgroundColor: t.accento },
-            ]}
+            style={[styles.decoro, styles.decoroPiccolo, { backgroundColor: t.accento }]}
           />
           <Text style={[styles.heroEtichetta, { color: t.heroSecondario }]}>
             AZIONE RAPIDA
@@ -224,15 +222,7 @@ export default function HomeScreen() {
   );
 }
 
-function CardMenu({
-  voce,
-  t,
-  scuro,
-}: {
-  voce: VoceMenu;
-  t: Tema;
-  scuro: boolean;
-}) {
+function CardMenu({ voce, t, scuro }: { voce: VoceMenu; t: Tema; scuro: boolean }) {
   return (
     <Link href={voce.href} asChild>
       <Pressable
@@ -255,9 +245,7 @@ function CardMenu({
           </View>
           <Text style={[styles.freccia, { color: t.testoSecondario }]}>↗</Text>
         </View>
-        <Text style={[styles.cardTitolo, { color: t.testo }]}>
-          {voce.titolo}
-        </Text>
+        <Text style={[styles.cardTitolo, { color: t.testo }]}>{voce.titolo}</Text>
         <Text
           style={[styles.cardDescrizione, { color: t.testoSecondario }]}
           numberOfLines={2}
@@ -306,13 +294,7 @@ const styles = StyleSheet.create({
   },
   decoro: { position: 'absolute', borderRadius: 999, opacity: 0.18 },
   decoroGrande: { width: 220, height: 220, top: -90, right: -70 },
-  decoroPiccolo: {
-    width: 90,
-    height: 90,
-    bottom: -30,
-    right: 70,
-    opacity: 0.12,
-  },
+  decoroPiccolo: { width: 90, height: 90, bottom: -30, right: 70, opacity: 0.12 },
   heroEtichetta: { fontSize: 12, fontWeight: '700', letterSpacing: 1.2 },
   heroTitolo: {
     fontSize: 24,

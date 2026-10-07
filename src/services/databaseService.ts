@@ -1,4 +1,5 @@
 import { adesso, getDbConnection } from './db';
+import { segnalaModificaLocale } from './eventiSync';
 import { nuovoId } from './id';
 
 // --- INTERFACCE ---
@@ -44,7 +45,7 @@ export interface Preventivo {
   id: string;
   cliente_id: string;
   cliente_nome?: string;
-  numero_preventivo: number;
+  numero_preventivo: number | null; // null = bozza, numero non ancora assegnato
   anno: number;
   data_creazione: string;
   oggetto?: string;
@@ -125,6 +126,7 @@ export async function updateProfiloFabbro(
       ]
     );
   }
+  segnalaModificaLocale();
 }
 
 // --- CLIENTI ---
@@ -161,6 +163,7 @@ export async function addCliente(
       adesso(),
     ]
   );
+  segnalaModificaLocale();
   return id;
 }
 
@@ -184,6 +187,7 @@ export async function updateCliente(
       id,
     ]
   );
+  segnalaModificaLocale();
 }
 
 // Cancellazione "soft": la riga resta, con la data di cancellazione.
@@ -211,23 +215,10 @@ export async function deleteCliente(id: string): Promise<void> {
      WHERE id = ?;`,
     [ora, ora, id]
   );
+  segnalaModificaLocale();
 }
 
 // --- PREVENTIVI ---
-
-// Prossimo numero progressivo per l'anno indicato (1, 2, 3... ripartendo ogni anno).
-// Conta anche i preventivi cancellati: un numero già usato non viene
-// riassegnato, così non esistono mai due documenti diversi con lo stesso numero.
-export async function getProssimoNumeroPreventivo(
-  anno: number = new Date().getFullYear()
-): Promise<number> {
-  const db = await getDbConnection();
-  const ultimo = await db.getFirstAsync<{ max_num: number | null }>(
-    'SELECT MAX(numero_preventivo) as max_num FROM preventivi WHERE anno = ?;',
-    [anno]
-  );
-  return (ultimo?.max_num || 0) + 1;
-}
 
 export async function savePreventivoWithVoci(
   input: PreventivoInput
@@ -235,11 +226,10 @@ export async function savePreventivoWithVoci(
   const db = await getDbConnection();
   const annoCorrente = new Date().getFullYear();
 
-  // Calcolo del prossimo numero progressivo per l'anno corrente
-  const prossimoNumero = await getProssimoNumeroPreventivo(annoCorrente);
-
-  // L'ID è un UUID e non contiene più anno e numero: il numero progressivo
-  // resta nelle colonne numero_preventivo e anno, ed è quello mostrato all'utente.
+  // Il preventivo nasce come bozza SENZA numero: il numero progressivo lo
+  // assegna il server al primo invio (assegnaNumero in syncService.ts).
+  // Così due dispositivi offline non possono mai darsi lo stesso numero.
+  // L'ID invece è un UUID, unico da subito anche offline.
   const preventivoId = nuovoId();
   const dataCreazione = new Date().toISOString();
   const aliquotaIva = input.aliquota_iva ?? 22;
@@ -266,7 +256,7 @@ export async function savePreventivoWithVoci(
       [
         preventivoId,
         input.cliente_id,
-        prossimoNumero,
+        null, // numero: assegnato dal server al primo invio
         annoCorrente,
         dataCreazione,
         input.oggetto || '',
@@ -298,6 +288,7 @@ export async function savePreventivoWithVoci(
     }
   });
 
+  segnalaModificaLocale();
   return preventivoId;
 }
 
@@ -363,6 +354,7 @@ export async function updateStatoPreventivo(
      WHERE id = ?;`,
     [stato, adesso(), id]
   );
+  segnalaModificaLocale();
 }
 
 // Cancellazione "soft" del preventivo.
@@ -373,8 +365,9 @@ export async function deletePreventivo(id: string): Promise<void> {
   const ora = adesso();
   await db.runAsync(
     `UPDATE preventivi
-    SET deleted_at = ?, updated_at = ?, da_sincronizzare = 1
-    WHERE id = ?;`,
+     SET deleted_at = ?, updated_at = ?, da_sincronizzare = 1
+     WHERE id = ?;`,
     [ora, ora, id]
   );
+  segnalaModificaLocale();
 }

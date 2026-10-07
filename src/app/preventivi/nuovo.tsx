@@ -10,31 +10,20 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-  FoglioNuovaVoce,
-  type NuovaVoce,
-} from '../../components/preventivi/FoglioNuovaVoce';
-import {
-  descriviCliente,
-  SelettoreCliente,
-} from '../../components/preventivi/SelettoreCliente';
+import { FoglioNuovaVoce, type NuovaVoce } from '../../components/preventivi/FoglioNuovaVoce';
+import { descriviCliente, SelettoreCliente } from '../../components/preventivi/SelettoreCliente';
 import { avviso } from '../../utils/dialoghi';
 import { useTema, type Tema } from '../../constants/tema';
 import {
   getClienteById,
   getPreventivoById,
-  getProssimoNumeroPreventivo,
   getVociByPreventivoId,
   savePreventivoWithVoci,
   type Cliente,
 } from '../../services/databaseService';
 import { updatePreventivoWithVoci } from '../../services/modificaPreventivoService';
 import { condividiPdfPreventivo } from '../../services/pdfService';
-import {
-  formattaData,
-  formattaEuro,
-  formattaNumeroPreventivo,
-} from '../../utils/formato';
+import { formattaData, formattaEuro, formattaNumeroPreventivo } from '../../utils/formato';
 
 const ALIQUOTA_IVA = 22;
 
@@ -56,9 +45,7 @@ export default function NuovoPreventivoScreen() {
 
   const [numero, setNumero] = useState<number | null>(null);
   const [anno, setAnno] = useState(new Date().getFullYear());
-  const [dataEmissione, setDataEmissione] = useState<string>(
-    new Date().toISOString()
-  );
+  const [dataEmissione, setDataEmissione] = useState<string>(new Date().toISOString());
   const [aliquotaIva, setAliquotaIva] = useState(ALIQUOTA_IVA);
   const [note, setNote] = useState(''); // non modificabili qui, ma da conservare
   const [cliente, setCliente] = useState<Cliente | null>(null);
@@ -70,15 +57,6 @@ export default function NuovoPreventivoScreen() {
   const [voceInModifica, setVoceInModifica] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [caricamento, setCaricamento] = useState(inModifica);
-
-  // Nuovo preventivo: numero provvisorio da mostrare, quello definitivo viene
-  // assegnato al salvataggio
-  useEffect(() => {
-    if (inModifica) return;
-    getProssimoNumeroPreventivo(new Date().getFullYear())
-      .then(setNumero)
-      .catch(console.error);
-  }, [inModifica]);
 
   // Modifica: carica il preventivo esistente con le sue voci e il cliente
   useEffect(() => {
@@ -125,10 +103,7 @@ export default function NuovoPreventivoScreen() {
       .catch(console.error);
   }, [idCliente]);
 
-  const imponibile = voci.reduce(
-    (somma, v) => somma + v.quantita * v.prezzo_unitario,
-    0
-  );
+  const imponibile = voci.reduce((somma, v) => somma + v.quantita * v.prezzo_unitario, 0);
   const iva = (imponibile * aliquotaIva) / 100;
   const totale = imponibile + iva;
 
@@ -136,15 +111,10 @@ export default function NuovoPreventivoScreen() {
   const confermaVoce = (voce: NuovaVoce) => {
     if (voceInModifica) {
       setVoci((attuali) =>
-        attuali.map((v) =>
-          v.chiave === voceInModifica ? { ...voce, chiave: v.chiave } : v
-        )
+        attuali.map((v) => (v.chiave === voceInModifica ? { ...voce, chiave: v.chiave } : v))
       );
     } else {
-      setVoci((attuali) => [
-        ...attuali,
-        { ...voce, chiave: `${Date.now()}-${attuali.length}` },
-      ]);
+      setVoci((attuali) => [...attuali, { ...voce, chiave: `${Date.now()}-${attuali.length}` }]);
     }
     chiudiFoglio();
   };
@@ -164,8 +134,7 @@ export default function NuovoPreventivoScreen() {
     setVoceInModifica(null);
   };
 
-  const voceDaModificare =
-    voci.find((v) => v.chiave === voceInModifica) ?? null;
+  const voceDaModificare = voci.find((v) => v.chiave === voceInModifica) ?? null;
 
   const rimuoviVoce = (chiave: string) =>
     setVoci((attuali) => attuali.filter((v) => v.chiave !== chiave));
@@ -223,10 +192,7 @@ export default function NuovoPreventivoScreen() {
       }
 
       // replace: con "indietro" dal dettaglio si torna alla lista, non al form
-      router.replace({
-        pathname: '/preventivi/[idPreventivo]',
-        params: { idPreventivo: id },
-      });
+      router.replace({ pathname: '/preventivi/[idPreventivo]', params: { idPreventivo: id } });
     } catch (err) {
       console.error(err);
       avviso('Errore', 'Impossibile salvare il preventivo.');
@@ -235,16 +201,11 @@ export default function NuovoPreventivoScreen() {
     }
   };
 
-  const stileCampo = [
-    styles.campo,
-    { backgroundColor: t.input, borderColor: t.bordo },
-  ];
+  const stileCampo = [styles.campo, { backgroundColor: t.input, borderColor: t.bordo }];
 
   if (caricamento) {
     return (
-      <View
-        style={[styles.container, styles.centro, { backgroundColor: t.sfondo }]}
-      >
+      <View style={[styles.container, styles.centro, { backgroundColor: t.sfondo }]}>
         <ActivityIndicator color={t.accento} size="large" />
       </View>
     );
@@ -254,14 +215,8 @@ export default function NuovoPreventivoScreen() {
     <View style={[styles.container, { backgroundColor: t.sfondo }]}>
       {/* Barra superiore */}
       <View style={[styles.barra, { paddingTop: insets.top + 12 }]}>
-        <Pressable
-          onPress={() => router.back()}
-          hitSlop={12}
-          accessibilityRole="button"
-        >
-          <Text style={[styles.annulla, { color: t.testoSecondario }]}>
-            Annulla
-          </Text>
+        <Pressable onPress={() => router.back()} hitSlop={12} accessibilityRole="button">
+          <Text style={[styles.annulla, { color: t.testoSecondario }]}>Annulla</Text>
         </Pressable>
         <Text style={[styles.titoloBarra, { color: t.testo }]}>
           {inModifica ? 'Modifica Preventivo' : 'Nuovo Preventivo'}
@@ -270,10 +225,7 @@ export default function NuovoPreventivoScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={[
-          styles.contenuto,
-          { paddingBottom: insets.bottom + 32 },
-        ]}
+        contentContainerStyle={[styles.contenuto, { paddingBottom: insets.bottom + 32 }]}
         keyboardShouldPersistTaps="handled"
       >
         <Etichetta testo="CLIENTE" t={t} />
@@ -284,15 +236,10 @@ export default function NuovoPreventivoScreen() {
           accessibilityLabel="Scegli il cliente"
         >
           <Text
-            style={[
-              styles.campoTesto,
-              { color: cliente ? t.testo : t.testoSecondario },
-            ]}
+            style={[styles.campoTesto, { color: cliente ? t.testo : t.testoSecondario }]}
             numberOfLines={1}
           >
-            {cliente
-              ? descriviCliente(cliente)
-              : 'Tocca per scegliere un cliente'}
+            {cliente ? descriviCliente(cliente) : 'Tocca per scegliere un cliente'}
           </Text>
           <Text style={{ color: t.testoSecondario }}>▾</Text>
         </Pressable>
@@ -300,15 +247,15 @@ export default function NuovoPreventivoScreen() {
         <Etichetta testo="N° PREVENTIVO" t={t} />
         <View style={stileCampo}>
           <Text style={[styles.campoTesto, { color: t.testo }]}>
-            {numero !== null ? formattaNumeroPreventivo(anno, numero) : '…'}
+            {numero !== null
+              ? formattaNumeroPreventivo(anno, numero)
+              : 'Bozza · il numero viene assegnato al primo invio'}
           </Text>
         </View>
 
         <Etichetta testo="DATA" t={t} />
         <View style={stileCampo}>
-          <Text style={[styles.campoTesto, { color: t.testo }]}>
-            {formattaData(dataEmissione)}
-          </Text>
+          <Text style={[styles.campoTesto, { color: t.testo }]}>{formattaData(dataEmissione)}</Text>
         </View>
 
         <Etichetta testo="OGGETTO DEL LAVORO" t={t} />
@@ -322,38 +269,21 @@ export default function NuovoPreventivoScreen() {
 
         {/* Voci di costo */}
         <View style={styles.intestazioneVoci}>
-          <Text
-            style={[
-              styles.etichetta,
-              styles.senzaMargine,
-              { color: t.testoSecondario },
-            ]}
-          >
+          <Text style={[styles.etichetta, styles.senzaMargine, { color: t.testoSecondario }]}>
             VOCI DI COSTO ({voci.length})
           </Text>
-          <Pressable
-            onPress={apriNuovaVoce}
-            hitSlop={8}
-            accessibilityRole="button"
-          >
-            <Text style={[styles.linkAggiungi, { color: t.accento }]}>
-              + AGGIUNGI VOCE
-            </Text>
+          <Pressable onPress={apriNuovaVoce} hitSlop={8} accessibilityRole="button">
+            <Text style={[styles.linkAggiungi, { color: t.accento }]}>+ AGGIUNGI VOCE</Text>
           </Pressable>
         </View>
 
         {voci.map((v) => (
           <View
             key={v.chiave}
-            style={[
-              styles.voce,
-              { backgroundColor: t.card, borderColor: t.bordo },
-            ]}
+            style={[styles.voce, { backgroundColor: t.card, borderColor: t.bordo }]}
           >
             <View style={styles.voceTesta}>
-              <Text style={[styles.voceDescrizione, { color: t.testo }]}>
-                {v.descrizione}
-              </Text>
+              <Text style={[styles.voceDescrizione, { color: t.testo }]}>{v.descrizione}</Text>
               <View style={styles.voceAzioni}>
                 <Pressable
                   onPress={() => apriModificaVoce(v.chiave)}
@@ -396,36 +326,17 @@ export default function NuovoPreventivoScreen() {
           ]}
           accessibilityRole="button"
         >
-          <Text style={[styles.aggiungiTesto, { color: t.accento }]}>
-            ＋ Aggiungi Voce
-          </Text>
+          <Text style={[styles.aggiungiTesto, { color: t.accento }]}>＋ Aggiungi Voce</Text>
         </Pressable>
 
         {/* Riepilogo */}
-        <View
-          style={[
-            styles.riepilogo,
-            { backgroundColor: t.card, borderTopColor: t.accento },
-          ]}
-        >
-          <RigaTotale
-            etichetta="Imponibile:"
-            valore={formattaEuro(imponibile)}
-            t={t}
-          />
-          <RigaTotale
-            etichetta={`IVA (${aliquotaIva}%):`}
-            valore={formattaEuro(iva)}
-            t={t}
-          />
+        <View style={[styles.riepilogo, { backgroundColor: t.card, borderTopColor: t.accento }]}>
+          <RigaTotale etichetta="Imponibile:" valore={formattaEuro(imponibile)} t={t} />
+          <RigaTotale etichetta={`IVA (${aliquotaIva}%):`} valore={formattaEuro(iva)} t={t} />
           <View style={[styles.separatore, { backgroundColor: t.bordo }]} />
           <View style={styles.rigaTotale}>
-            <Text style={[styles.totaleEtichetta, { color: t.testo }]}>
-              TOTALE:
-            </Text>
-            <Text style={[styles.totaleValore, { color: t.accento }]}>
-              {formattaEuro(totale)}
-            </Text>
+            <Text style={[styles.totaleEtichetta, { color: t.testo }]}>TOTALE:</Text>
+            <Text style={[styles.totaleValore, { color: t.accento }]}>{formattaEuro(totale)}</Text>
           </View>
         </View>
 
@@ -469,30 +380,14 @@ export default function NuovoPreventivoScreen() {
 }
 
 function Etichetta({ testo, t }: { testo: string; t: Tema }) {
-  return (
-    <Text style={[styles.etichetta, { color: t.testoSecondario }]}>
-      {testo}
-    </Text>
-  );
+  return <Text style={[styles.etichetta, { color: t.testoSecondario }]}>{testo}</Text>;
 }
 
-function RigaTotale({
-  etichetta,
-  valore,
-  t,
-}: {
-  etichetta: string;
-  valore: string;
-  t: Tema;
-}) {
+function RigaTotale({ etichetta, valore, t }: { etichetta: string; valore: string; t: Tema }) {
   return (
     <View style={styles.rigaTotale}>
-      <Text style={[styles.rigaEtichetta, { color: t.testoSecondario }]}>
-        {etichetta}
-      </Text>
-      <Text style={[styles.rigaValore, { color: t.testoSecondario }]}>
-        {valore}
-      </Text>
+      <Text style={[styles.rigaEtichetta, { color: t.testoSecondario }]}>{etichetta}</Text>
+      <Text style={[styles.rigaValore, { color: t.testoSecondario }]}>{valore}</Text>
     </View>
   );
 }
@@ -515,12 +410,7 @@ const styles = StyleSheet.create({
   titoloBarra: { fontSize: 17, fontWeight: '800' },
   segnapostoBarra: { width: 70 },
 
-  contenuto: {
-    paddingHorizontal: 16,
-    width: '100%',
-    maxWidth: 720,
-    alignSelf: 'center',
-  },
+  contenuto: { paddingHorizontal: 16, width: '100%', maxWidth: 720, alignSelf: 'center' },
 
   etichetta: {
     fontSize: 12,
@@ -582,12 +472,7 @@ const styles = StyleSheet.create({
   },
   aggiungiTesto: { fontSize: 14, fontWeight: '700' },
 
-  riepilogo: {
-    borderTopWidth: 2,
-    borderRadius: 12,
-    padding: 12,
-    marginTop: 16,
-  },
+  riepilogo: { borderTopWidth: 2, borderRadius: 12, padding: 12, marginTop: 16 },
   rigaTotale: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -600,12 +485,7 @@ const styles = StyleSheet.create({
   totaleEtichetta: { fontSize: 18, fontWeight: '800' },
   totaleValore: { fontSize: 20, fontWeight: '800' },
 
-  salva: {
-    borderRadius: 10,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 20,
-  },
+  salva: { borderRadius: 10, paddingVertical: 16, alignItems: 'center', marginTop: 20 },
   salvaTesto: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
 
   disabilitato: { opacity: 0.6 },

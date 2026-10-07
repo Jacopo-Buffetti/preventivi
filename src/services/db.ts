@@ -67,7 +67,7 @@ async function apriEInizializza(): Promise<SQLite.SQLiteDatabase> {
     CREATE TABLE IF NOT EXISTS preventivi (
       id TEXT PRIMARY KEY NOT NULL,
       cliente_id TEXT NOT NULL,
-      numero_preventivo INTEGER NOT NULL,
+      numero_preventivo INTEGER,
       anno INTEGER NOT NULL,
       data_creazione TEXT NOT NULL,
       oggetto TEXT,
@@ -123,6 +123,20 @@ async function apriEInizializza(): Promise<SQLite.SQLiteDatabase> {
 
   // Migrazione per la sincronizzazione (vedi commento sotto)
   await aggiungiColonneSincronizzazione(db);
+
+  // Migrazione: numero_preventivo facoltativo (le bozze non hanno numero)
+  await rendiNumeroFacoltativo(db);
+
+  // 6. Stato della sincronizzazione: piccola tabella "chiave → valore".
+  // Contiene, per esempio:
+  //   utente        → id dell'utente a cui appartengono i dati di questo dispositivo
+  //   pull:clienti  → fino a quando abbiamo già scaricato i clienti dal server
+  await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS sync_stato (
+      chiave TEXT PRIMARY KEY NOT NULL,
+      valore TEXT
+    );
+  `);
 
   console.log('Database aperto e tabelle pronte.');
   return db;
@@ -187,12 +201,7 @@ async function aggiungiColonneSincronizzazione(db: SQLite.SQLiteDatabase) {
   for (const { nome, cancellabile } of tabelle) {
     // SQLite non accetta un default "dinamico" (come l'ora attuale) in
     // ALTER TABLE: aggiungiamo la colonna vuota e la riempiamo subito dopo.
-    const aggiunta = await aggiungiColonnaSeManca(
-      db,
-      nome,
-      'updated_at',
-      'TEXT'
-    );
+    const aggiunta = await aggiungiColonnaSeManca(db, nome, 'updated_at', 'TEXT');
     if (aggiunta) {
       await db.execAsync(
         `UPDATE ${nome} SET updated_at = ${ADESSO_SQL} WHERE updated_at IS NULL;`
@@ -211,5 +220,64 @@ async function aggiungiColonneSincronizzazione(db: SQLite.SQLiteDatabase) {
       // NULL = riga attiva; una data = riga cancellata
       await aggiungiColonnaSeManca(db, nome, 'deleted_at', 'TEXT');
     }
+  }
+}
+
+// Le bozze non hanno ancora un numero: lo ricevono dal server al primo
+// invio (strategia B). Serve quindi che numero_preventivo accetti NULL.
+//
+// SQLite non permette di togliere un NOT NULL da una colonna esistente.
+// L'unico modo è la procedura ufficiale di "ricostruzione":
+//   1. creare una tabella nuova con la struttura giusta
+//   2. copiarci tutti i dati
+//   3. eliminare la tabella vecchia
+//   4. rinominare la nuova con il nome della vecchia
+//
+// Attenzione al punto 3: voci_preventivo ha una chiave esterna verso
+// preventivi con ON DELETE CASCADE. Con le chiavi esterne attive,
+// eliminare la tabella preventivi cancellerebbe anche TUTTE le voci.
+// Per questo le disattiviamo durante la ricostruzione (va fatto fuori
+// dalla transazione: dentro una transazione SQLite ignora il comando).
+async function rendiNumeroFacoltativo(db: SQLite.SQLiteDatabase) {
+  const colonne = await db.getAllAsync<{ name: string; notnull: number }>(
+    'PRAGMA table_info(preventivi);'
+  );
+  const numero = colonne.find((c) => c.name === 'numero_preventivo');
+  // Già facoltativo (database nuovo o migrazione già fatta): niente da fare
+  if (!numero || numero.notnull === 0) return;
+
+  const elenco = `id, cliente_id, numero_preventivo, anno, data_creazione, oggetto, stato,
+    aliquota_iva, note_pagamento, totale_imponibile, totale_iva, totale_generale,
+    updated_at, da_sincronizzare, deleted_at`;
+
+  await db.execAsync('PRAGMA foreign_keys = OFF;');
+  try {
+    await db.withTransactionAsync(async () => {
+      await db.execAsync(`
+        CREATE TABLE preventivi_nuova (
+          id TEXT PRIMARY KEY NOT NULL,
+          cliente_id TEXT NOT NULL,
+          numero_preventivo INTEGER,
+          anno INTEGER NOT NULL,
+          data_creazione TEXT NOT NULL,
+          oggetto TEXT,
+          stato TEXT NOT NULL DEFAULT 'bozza',
+          aliquota_iva REAL NOT NULL DEFAULT 22,
+          note_pagamento TEXT,
+          totale_imponibile REAL NOT NULL DEFAULT 0,
+          totale_iva REAL NOT NULL DEFAULT 0,
+          totale_generale REAL NOT NULL DEFAULT 0,
+          updated_at TEXT,
+          da_sincronizzare INTEGER NOT NULL DEFAULT 1,
+          deleted_at TEXT,
+          FOREIGN KEY (cliente_id) REFERENCES clienti (id) ON DELETE RESTRICT
+        );
+        INSERT INTO preventivi_nuova (${elenco}) SELECT ${elenco} FROM preventivi;
+        DROP TABLE preventivi;
+        ALTER TABLE preventivi_nuova RENAME TO preventivi;
+      `);
+    });
+  } finally {
+    await db.execAsync('PRAGMA foreign_keys = ON;');
   }
 }

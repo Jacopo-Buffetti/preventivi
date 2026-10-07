@@ -1,12 +1,15 @@
 // Funzioni di formattazione condivise
 
-export function formattaNumeroPreventivo(anno: number, numero: number): string {
+// Le bozze non hanno ancora un numero (null): lo ricevono al primo invio
+export function formattaNumeroPreventivo(anno: number, numero: number | null): string {
+  if (numero === null) return 'Bozza';
   return `${anno}/${String(numero).padStart(3, '0')}`;
 }
 
 // Nome del file PDF, senza la "/" che non è ammessa nei nomi dei file.
 // Esempio: preventivo-2026-005.pdf
-export function nomeFilePreventivo(anno: number, numero: number): string {
+export function nomeFilePreventivo(anno: number, numero: number | null): string {
+  if (numero === null) return 'preventivo-bozza.pdf';
   return `preventivo-${anno}-${String(numero).padStart(3, '0')}.pdf`;
 }
 

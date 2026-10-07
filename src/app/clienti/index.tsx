@@ -1,17 +1,20 @@
-import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useRouter } from 'expo-router';
+import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
   Pressable,
+  RefreshControl,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useCaricaQuandoVisibile } from '../../hooks/useCaricaQuandoVisibile';
 import { useTema } from '../../constants/tema';
 import { getClienti, type Cliente } from '../../services/databaseService';
+import { useTiraPerAggiornare } from '../../services/syncAutomatico';
 import { avviso } from '../../utils/dialoghi';
 
 export default function ClientiScreen() {
@@ -23,17 +26,17 @@ export default function ClientiScreen() {
   const [caricamento, setCaricamento] = useState(true);
   const [ricerca, setRicerca] = useState('');
 
-  useFocusEffect(
-    useCallback(() => {
-      getClienti()
-        .then(setClienti)
-        .catch((err) => {
-          console.error(err);
-          avviso('Errore', 'Impossibile caricare la rubrica clienti.');
-        })
-        .finally(() => setCaricamento(false));
-    }, [])
-  );
+  const { aggiornando, aggiorna } = useTiraPerAggiornare();
+
+  useCaricaQuandoVisibile(() => {
+    getClienti()
+      .then(setClienti)
+      .catch((err) => {
+        console.error(err);
+        avviso('Errore', 'Impossibile caricare la rubrica clienti.');
+      })
+      .finally(() => setCaricamento(false));
+  });
 
   const filtrati = useMemo(() => {
     const q = ricerca.trim().toLowerCase();
@@ -46,6 +49,9 @@ export default function ClientiScreen() {
       <FlatList
         data={filtrati}
         keyExtractor={(c) => c.id}
+        refreshControl={
+          <RefreshControl refreshing={aggiornando} onRefresh={aggiorna} tintColor={t.accento} />
+        }
         contentContainerStyle={[
           styles.lista,
           { paddingTop: insets.top + 24, paddingBottom: 100 },

@@ -1,9 +1,9 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import * as MailComposer from 'expo-mail-composer';
 import * as Print from 'expo-print';
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import {
   ActivityIndicator,
   Linking,
@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useCaricaQuandoVisibile } from '../../hooks/useCaricaQuandoVisibile';
 import { ORDINE_STATI, STATI } from '../../constants/stati';
 import { useTema, type Tema } from '../../constants/tema';
 import {
@@ -32,6 +33,7 @@ import {
   generaPdfPreventivo,
 } from '../../services/pdfService';
 import { avviso, conferma } from '../../utils/dialoghi';
+import { prontoPerInvio } from '../../utils/invioPreventivo';
 import {
   formattaData,
   formattaEuro,
@@ -52,24 +54,23 @@ export default function DettaglioPreventivoScreen() {
   const [caricamento, setCaricamento] = useState(true);
   const [generandoPdf, setGenerandoPdf] = useState(false);
 
-  useFocusEffect(
-    useCallback(() => {
-      if (!idPreventivo) return;
-      Promise.all([
-        getPreventivoById(idPreventivo),
-        getVociByPreventivoId(idPreventivo),
-      ])
-        .then(([p, v]) => {
-          setPreventivo(p);
-          setVoci(v);
-        })
-        .catch((err) => {
-          console.error(err);
-          avviso('Errore', 'Impossibile caricare il preventivo.');
-        })
-        .finally(() => setCaricamento(false));
-    }, [idPreventivo])
-  );
+
+  useCaricaQuandoVisibile(() => {
+    if (!idPreventivo) return;
+    Promise.all([
+      getPreventivoById(idPreventivo),
+      getVociByPreventivoId(idPreventivo),
+    ])
+      .then(([p, v]) => {
+        setPreventivo(p);
+        setVoci(v);
+      })
+      .catch((err) => {
+        console.error(err);
+        avviso('Errore', 'Impossibile caricare il preventivo.');
+      })
+      .finally(() => setCaricamento(false));
+  });
 
   // Se si arriva qui da un link diretto non c'è una pagina a cui tornare
   const tornaAllaLista = () => {
@@ -90,11 +91,23 @@ export default function DettaglioPreventivoScreen() {
     }
   };
 
+  // Da chiamare prima di ogni invio (condivisione, WhatsApp, email, stampa):
+  // se è una bozza le fa assegnare il numero dal server (vedi invioPreventivo.ts)
+  // e aggiorna subito la schermata con numero e stato nuovi.
+  const preparaInvio = async (): Promise<PreventivoConCliente | null> => {
+    if (!preventivo) return null;
+    const pronto = await prontoPerInvio(preventivo);
+    if (pronto && pronto !== preventivo) setPreventivo(pronto);
+    return pronto;
+  };
+
   const condividi = async () => {
     if (!preventivo) return;
     try {
       setGenerandoPdf(true);
-      await condividiPdfPreventivo(preventivo.id);
+      const p = await preparaInvio();
+      if (!p) return;
+      await condividiPdfPreventivo(p.id);
     } catch (err) {
       console.error(err);
       avviso('Errore', 'Impossibile generare il PDF del preventivo.');
@@ -108,12 +121,11 @@ export default function DettaglioPreventivoScreen() {
     if (!preventivo) return;
     try {
       setGenerandoPdf(true);
-      const uri = await generaPdfPreventivo(preventivo.id);
+      const p = await preparaInvio();
+      if (!p) return;
+      const uri = await generaPdfPreventivo(p.id);
 
-      const filename = nomeFilePreventivo(
-        preventivo.anno,
-        preventivo.numero_preventivo
-      );
+      const filename = nomeFilePreventivo(p.anno, p.numero_preventivo);
       // Se la copia fallisce si stampa comunque il file generato
       let daStampare = uri;
       try {
@@ -151,11 +163,13 @@ export default function DettaglioPreventivoScreen() {
     if (!preventivo) return;
     try {
       setGenerandoPdf(true);
-      const uri = await generaPdfPreventivo(preventivo.id);
+      const p = await preparaInvio();
+      if (!p) return;
+      const uri = await generaPdfPreventivo(p.id);
 
       const testo = `Ti invio il preventivo N° ${formattaNumeroPreventivo(
-        preventivo.anno,
-        preventivo.numero_preventivo
+        p.anno,
+        p.numero_preventivo
       )}`;
 
       // Preferisci usare `react-native-share` (richiede dev/custom build)
@@ -227,16 +241,15 @@ export default function DettaglioPreventivoScreen() {
     if (!preventivo) return;
     try {
       setGenerandoPdf(true);
-      const uri = await generaPdfPreventivo(preventivo.id);
+      const p = await preparaInvio();
+      if (!p) return;
+      const uri = await generaPdfPreventivo(p.id);
 
-      const destinatario = preventivo.cliente_email || '';
-      const subject = `Preventivo ${formattaNumeroPreventivo(
-        preventivo.anno,
-        preventivo.numero_preventivo
-      )}`;
-      const body = `Ciao ${preventivo.cliente_nome ?? ''},\n\nIn allegato trovi il preventivo ${formattaNumeroPreventivo(
-        preventivo.anno,
-        preventivo.numero_preventivo
+      const destinatario = p.cliente_email || '';
+      const subject = `Preventivo ${formattaNumeroPreventivo(p.anno, p.numero_preventivo)}`;
+      const body = `Ciao ${p.cliente_nome ?? ''},\n\nIn allegato trovi il preventivo ${formattaNumeroPreventivo(
+        p.anno,
+        p.numero_preventivo
       )}.\n\nSaluti`;
 
       if (await MailComposer.isAvailableAsync()) {
@@ -354,9 +367,7 @@ export default function DettaglioPreventivoScreen() {
           accessibilityRole="button"
           accessibilityLabel="Modifica preventivo"
         >
-          <Text style={[styles.pillModificaTesto, { color: t.accento }]}>
-            ✎ Modifica
-          </Text>
+          <Text style={[styles.pillModificaTesto, { color: t.accento }]}>✎  Modifica</Text>
         </Pressable>
       </View>
 

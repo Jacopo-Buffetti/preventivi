@@ -11,7 +11,8 @@ import {
   type DimensionValue,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { FONT, useTema } from '../../constants/tema';
+import { useTema } from '../../constants/tema';
+import { styles } from './FoglioInBasso.styles';
 
 // Cornice comune ai fogli che salgono dal basso (nuova voce, scelta del
 // cliente): sfondo scuro che chiude al tocco, maniglia, titolo, X.
@@ -88,37 +89,3 @@ export function FoglioInBasso({
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  contenitore: { flex: 1, justifyContent: 'flex-end' },
-  foglio: {
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    width: '100%',
-    maxWidth: 720,
-    alignSelf: 'center',
-  },
-  maniglia: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: 12,
-  },
-  testa: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  titolo: { fontSize: 20, fontFamily: FONT.pieno, flexShrink: 1 },
-  chiudi: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});

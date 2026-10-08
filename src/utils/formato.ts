@@ -35,7 +35,10 @@ export function formattaEuro(valore: number): string {
 }
 
 // Percentuale dello sconto sul totale con IVA, es. 4 su 244 → 1,639...
-export function percentualeSconto(sconto: number, totaleConIva: number): number {
+export function percentualeSconto(
+  sconto: number,
+  totaleConIva: number
+): number {
   if (totaleConIva <= 0) return 0;
   return (sconto / totaleConIva) * 100;
 }

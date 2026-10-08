@@ -4,15 +4,15 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { FONT, useTema } from '../../constants/tema';
+import { useTema } from '../../constants/tema';
 import { supabase } from '../../services/supabase';
 import { FormInput } from '../ui/FormInput';
 import { PrimaryButton } from '../ui/PrimaryButton';
+import { styles } from './SchermataLogin.styles';
 
 // Mostrata da _layout.tsx quando non c'è una sessione salvata.
 // Non naviga da nessuna parte: quando il login riesce, Supabase avvisa
@@ -138,43 +138,3 @@ function messaggioErrore(messaggio: string): string {
   }
   return messaggio;
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  contenuto: {
-    paddingHorizontal: 24,
-    width: '100%',
-    maxWidth: 480,
-    alignSelf: 'center',
-  },
-  // Il logo dell'app ha già il suo sfondo scuro: basta arrotondare gli
-  // angoli, come un'icona
-  logo: {
-    width: 140,
-    height: 140,
-    alignSelf: 'center',
-    marginBottom: 28,
-    borderRadius: 32,
-  },
-  titolo: {
-    fontSize: 30,
-    lineHeight: 36,
-    fontFamily: FONT.pieno,
-    letterSpacing: -0.5,
-  },
-  sottotitolo: {
-    fontSize: 14,
-    lineHeight: 20,
-    marginTop: 6,
-    marginBottom: 24,
-    fontFamily: FONT.regolare,
-  },
-  boxErrore: {
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginBottom: 8,
-  },
-  testoErrore: { fontSize: 14, fontFamily: FONT.semi },
-});

@@ -11,18 +11,13 @@ import type { Session } from '@supabase/supabase-js';
 import { Tabs } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState, type ComponentProps } from 'react';
-import {
-  ActivityIndicator,
-  StyleSheet,
-  Text,
-  View,
-  type ColorValue,
-} from 'react-native';
+import { ActivityIndicator, Text, View, type ColorValue } from 'react-native';
 import { SchermataLogin } from '../components/auth/SchermataLogin';
 import { FONT, ProviderTema, useSceltaTema, useTema } from '../constants/tema';
 import { initDatabase } from '../services/db';
 import { supabase } from '../services/supabase';
 import { avviaSincronizzazioneAutomatica } from '../services/syncAutomatico';
+import { styles } from '../styles/layout.styles';
 
 // Il provider del tema deve stare SOPRA a tutto il resto: per questo il
 // layout vero e proprio è un componente a parte, renderizzato dentro.
@@ -245,31 +240,3 @@ function IconaTab({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  centro: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  titolo: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  dettaglio: {
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  iconaTab: { alignItems: 'center', justifyContent: 'center' },
-  lineettaAttiva: {
-    position: 'absolute',
-    top: -9,
-    width: 26,
-    height: 3,
-    borderBottomLeftRadius: 3,
-    borderBottomRightRadius: 3,
-  },
-});

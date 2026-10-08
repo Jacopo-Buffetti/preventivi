@@ -47,14 +47,23 @@ export async function updatePreventivoWithVoci(
       ]
     );
 
-    await db.runAsync('DELETE FROM voci_preventivo WHERE preventivo_id = ?;', [idPreventivo]);
+    await db.runAsync('DELETE FROM voci_preventivo WHERE preventivo_id = ?;', [
+      idPreventivo,
+    ]);
 
     for (const voce of vociCalcolate) {
       const voceId = nuovoId();
       await db.runAsync(
         `INSERT INTO voci_preventivo (id, preventivo_id, descrizione, quantita, prezzo_unitario, totale_voce)
          VALUES (?, ?, ?, ?, ?, ?);`,
-        [voceId, idPreventivo, voce.descrizione, voce.quantita, voce.prezzo_unitario, voce.totaleVoce]
+        [
+          voceId,
+          idPreventivo,
+          voce.descrizione,
+          voce.quantita,
+          voce.prezzo_unitario,
+          voce.totaleVoce,
+        ]
       );
     }
   });

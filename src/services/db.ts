@@ -131,7 +131,12 @@ async function apriEInizializza(): Promise<SQLite.SQLiteDatabase> {
   // Va DOPO rendiNumeroFacoltativo: quella ricostruisce la tabella con un
   // elenco fisso di colonne e, se venisse prima, perderebbe questa.
   // Default 0 = nessun arrotondamento, quindi i preventivi vecchi non cambiano.
-  await aggiungiColonnaSeManca(db, 'preventivi', 'sconto', 'REAL NOT NULL DEFAULT 0');
+  await aggiungiColonnaSeManca(
+    db,
+    'preventivi',
+    'sconto',
+    'REAL NOT NULL DEFAULT 0'
+  );
 
   // 6. Stato della sincronizzazione: piccola tabella "chiave → valore".
   // Contiene, per esempio:
@@ -207,7 +212,12 @@ async function aggiungiColonneSincronizzazione(db: SQLite.SQLiteDatabase) {
   for (const { nome, cancellabile } of tabelle) {
     // SQLite non accetta un default "dinamico" (come l'ora attuale) in
     // ALTER TABLE: aggiungiamo la colonna vuota e la riempiamo subito dopo.
-    const aggiunta = await aggiungiColonnaSeManca(db, nome, 'updated_at', 'TEXT');
+    const aggiunta = await aggiungiColonnaSeManca(
+      db,
+      nome,
+      'updated_at',
+      'TEXT'
+    );
     if (aggiunta) {
       await db.execAsync(
         `UPDATE ${nome} SET updated_at = ${ADESSO_SQL} WHERE updated_at IS NULL;`

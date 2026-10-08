@@ -1,7 +1,8 @@
 import { Link, type Href } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTema } from '../../constants/tema';
+import { styles } from './PaginaSegnaposto.styles';
 
 interface PaginaSegnapostoProps {
   titolo: string;
@@ -49,18 +50,3 @@ export function PaginaSegnaposto({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 16 },
-  colonna: { width: '100%', maxWidth: 720, alignSelf: 'center' },
-  title: { fontSize: 24, fontWeight: '800', marginBottom: 8 },
-  subtitle: { fontSize: 16 },
-  button: {
-    padding: 16,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 24,
-  },
-  buttonPressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-});

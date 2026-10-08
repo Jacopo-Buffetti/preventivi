@@ -64,7 +64,10 @@ async function eseguiSincronizzazione(): Promise<RiepilogoSync> {
 
   // Se sono arrivati dati nuovi, le schermate aperte si ricaricano
   const qualcosaDiNuovo =
-    ricevuti.clienti > 0 || ricevuti.preventivi > 0 || ricevuti.profilo || ricevuti.biglietto;
+    ricevuti.clienti > 0 ||
+    ricevuti.preventivi > 0 ||
+    ricevuti.profilo ||
+    ricevuti.biglietto;
   if (qualcosaDiNuovo) segnalaDatiAggiornati();
 
   return { inviati, ricevuti };
@@ -142,7 +145,10 @@ async function utenteCollegato(): Promise<string> {
 // locali sono dell'altro utente: li cancelliamo prima di sincronizzare,
 // altrimenti il push li caricherebbe nell'account sbagliato.
 // (Stesso utente che esce e rientra: stesso id, non si cancella niente.)
-async function verificaUtente(db: SQLiteDatabase, userId: string): Promise<void> {
+async function verificaUtente(
+  db: SQLiteDatabase,
+  userId: string
+): Promise<void> {
   const salvato = await leggiStato(db, 'utente');
 
   if (salvato === userId) return;
@@ -172,7 +178,10 @@ async function verificaUtente(db: SQLiteDatabase, userId: string): Promise<void>
 // =====================================================================
 // L'ordine conta: i preventivi puntano ai clienti (cliente_id), quindi
 // il server deve ricevere prima i clienti, altrimenti rifiuta i preventivi.
-async function inviaModifiche(db: SQLiteDatabase, userId: string): Promise<RiepilogoPush> {
+async function inviaModifiche(
+  db: SQLiteDatabase,
+  userId: string
+): Promise<RiepilogoPush> {
   const clienti = await inviaClienti(db);
   const preventivi = await inviaPreventivi(db);
   const profilo = await inviaProfilo(db, userId);
@@ -217,7 +226,9 @@ async function inviaClienti(db: SQLiteDatabase): Promise<number> {
   // upsert = "inserisci, oppure aggiorna se l'id esiste già".
   // Mandiamo a blocchi per non fare richieste troppo grandi.
   for (const blocco of aBlocchi(daInviare, 100)) {
-    const { error } = await supabase.from('clienti').upsert(blocco, { onConflict: 'id' });
+    const { error } = await supabase
+      .from('clienti')
+      .upsert(blocco, { onConflict: 'id' });
     if (error) throw error;
   }
 
@@ -293,7 +304,9 @@ async function inviaPreventivi(db: SQLiteDatabase): Promise<number> {
 
   // Blocchi più piccoli: ogni preventivo porta con sé tutte le sue voci
   for (const blocco of aBlocchi(daInviare, 50)) {
-    const { error } = await supabase.from('preventivi').upsert(blocco, { onConflict: 'id' });
+    const { error } = await supabase
+      .from('preventivi')
+      .upsert(blocco, { onConflict: 'id' });
     if (error) throw error;
   }
 
@@ -316,7 +329,10 @@ interface RigaProfilo {
   updated_at: string | null;
 }
 
-async function inviaProfilo(db: SQLiteDatabase, userId: string): Promise<boolean> {
+async function inviaProfilo(
+  db: SQLiteDatabase,
+  userId: string
+): Promise<boolean> {
   const riga = await db.getFirstAsync<RigaProfilo>(
     'SELECT * FROM profilo_fabbro WHERE da_sincronizzare = 1 ORDER BY id LIMIT 1;'
   );
@@ -365,7 +381,10 @@ interface RigaBiglietto {
   updated_at: string | null;
 }
 
-async function inviaBiglietto(db: SQLiteDatabase, userId: string): Promise<boolean> {
+async function inviaBiglietto(
+  db: SQLiteDatabase,
+  userId: string
+): Promise<boolean> {
   const riga = await db.getFirstAsync<RigaBiglietto>(
     'SELECT * FROM biglietto WHERE id = 1 AND da_sincronizzare = 1;'
   );
@@ -420,7 +439,8 @@ async function riceviModifiche(db: SQLiteDatabase): Promise<RiepilogoPull> {
   const clienti = await scaricaTabella(db, 'clienti', applicaCliente);
   const preventivi = await scaricaTabella(db, 'preventivi', applicaPreventivo);
   const profilo = (await scaricaTabella(db, 'profilo', applicaProfilo)) > 0;
-  const biglietto = (await scaricaTabella(db, 'biglietto', applicaBiglietto)) > 0;
+  const biglietto =
+    (await scaricaTabella(db, 'biglietto', applicaBiglietto)) > 0;
 
   return { clienti, preventivi, profilo, biglietto };
 }
@@ -436,7 +456,9 @@ async function scaricaTabella<T extends { server_updated_at: string }>(
   const ultimo = await leggiStato(db, chiave);
 
   // Prima volta su questo dispositivo: nessun filtro, scarica tutto.
-  const da = ultimo ? new Date(msDa(ultimo) - MARGINE_PULL_MS).toISOString() : null;
+  const da = ultimo
+    ? new Date(msDa(ultimo) - MARGINE_PULL_MS).toISOString()
+    : null;
 
   let piuRecente = ultimo;
   let applicate = 0;
@@ -496,7 +518,8 @@ function vinceLaLocale(
   locale: { updated_at: string | null; da_sincronizzare: number } | null,
   updatedAtServer: string
 ): boolean {
-  if (!locale || locale.da_sincronizzare !== 1 || !locale.updated_at) return false;
+  if (!locale || locale.da_sincronizzare !== 1 || !locale.updated_at)
+    return false;
   return msDa(locale.updated_at) > msDa(updatedAtServer);
 }
 
@@ -531,11 +554,14 @@ interface ClienteServer {
   server_updated_at: string;
 }
 
-async function applicaCliente(db: SQLiteDatabase, c: ClienteServer): Promise<boolean> {
-  const locale = await db.getFirstAsync<{ updated_at: string | null; da_sincronizzare: number }>(
-    'SELECT updated_at, da_sincronizzare FROM clienti WHERE id = ?;',
-    [c.id]
-  );
+async function applicaCliente(
+  db: SQLiteDatabase,
+  c: ClienteServer
+): Promise<boolean> {
+  const locale = await db.getFirstAsync<{
+    updated_at: string | null;
+    da_sincronizzare: number;
+  }>('SELECT updated_at, da_sincronizzare FROM clienti WHERE id = ?;', [c.id]);
   if (daSaltare(locale, c.updated_at)) return false;
 
   // INSERT ... ON CONFLICT DO UPDATE = "upsert" di SQLite.
@@ -592,11 +618,16 @@ interface PreventivoServer {
   server_updated_at: string;
 }
 
-async function applicaPreventivo(db: SQLiteDatabase, p: PreventivoServer): Promise<boolean> {
-  const locale = await db.getFirstAsync<{ updated_at: string | null; da_sincronizzare: number }>(
-    'SELECT updated_at, da_sincronizzare FROM preventivi WHERE id = ?;',
-    [p.id]
-  );
+async function applicaPreventivo(
+  db: SQLiteDatabase,
+  p: PreventivoServer
+): Promise<boolean> {
+  const locale = await db.getFirstAsync<{
+    updated_at: string | null;
+    da_sincronizzare: number;
+  }>('SELECT updated_at, da_sincronizzare FROM preventivi WHERE id = ?;', [
+    p.id,
+  ]);
   if (daSaltare(locale, p.updated_at)) return false;
 
   // Preventivo e voci in un'unica transazione: o si aggiorna tutto o niente
@@ -643,13 +674,22 @@ async function applicaPreventivo(db: SQLiteDatabase, p: PreventivoServer): Promi
     );
 
     // Le voci arrivano tutte insieme: sostituiamo quelle locali
-    await db.runAsync('DELETE FROM voci_preventivo WHERE preventivo_id = ?;', [p.id]);
+    await db.runAsync('DELETE FROM voci_preventivo WHERE preventivo_id = ?;', [
+      p.id,
+    ]);
     for (const v of p.voci ?? []) {
       await db.runAsync(
         `INSERT INTO voci_preventivo
            (id, preventivo_id, descrizione, quantita, prezzo_unitario, totale_voce)
          VALUES (?, ?, ?, ?, ?, ?);`,
-        [v.id, p.id, v.descrizione, v.quantita, v.prezzo_unitario, v.totale_voce]
+        [
+          v.id,
+          p.id,
+          v.descrizione,
+          v.quantita,
+          v.prezzo_unitario,
+          v.totale_voce,
+        ]
       );
     }
   });
@@ -671,13 +711,18 @@ interface ProfiloServer {
   server_updated_at: string;
 }
 
-async function applicaProfilo(db: SQLiteDatabase, p: ProfiloServer): Promise<boolean> {
+async function applicaProfilo(
+  db: SQLiteDatabase,
+  p: ProfiloServer
+): Promise<boolean> {
   // In locale il profilo è la prima riga di profilo_fabbro (id automatico)
   const locale = await db.getFirstAsync<{
     id: number;
     updated_at: string | null;
     da_sincronizzare: number;
-  }>('SELECT id, updated_at, da_sincronizzare FROM profilo_fabbro ORDER BY id LIMIT 1;');
+  }>(
+    'SELECT id, updated_at, da_sincronizzare FROM profilo_fabbro ORDER BY id LIMIT 1;'
+  );
   if (daSaltare(locale, p.updated_at)) return false;
 
   const valori = [
@@ -720,10 +765,14 @@ interface BigliettoServer extends Omit<RigaBiglietto, 'id' | 'updated_at'> {
   server_updated_at: string;
 }
 
-async function applicaBiglietto(db: SQLiteDatabase, b: BigliettoServer): Promise<boolean> {
-  const locale = await db.getFirstAsync<{ updated_at: string | null; da_sincronizzare: number }>(
-    'SELECT updated_at, da_sincronizzare FROM biglietto WHERE id = 1;'
-  );
+async function applicaBiglietto(
+  db: SQLiteDatabase,
+  b: BigliettoServer
+): Promise<boolean> {
+  const locale = await db.getFirstAsync<{
+    updated_at: string | null;
+    da_sincronizzare: number;
+  }>('SELECT updated_at, da_sincronizzare FROM biglietto WHERE id = 1;');
   if (daSaltare(locale, b.updated_at)) return false;
 
   await db.runAsync(
@@ -794,7 +843,10 @@ async function segnaInviate(
 }
 
 // Lettura e scrittura nella tabella sync_stato (chiave → valore)
-async function leggiStato(db: SQLiteDatabase, chiave: string): Promise<string | null> {
+async function leggiStato(
+  db: SQLiteDatabase,
+  chiave: string
+): Promise<string | null> {
   const riga = await db.getFirstAsync<{ valore: string | null }>(
     'SELECT valore FROM sync_stato WHERE chiave = ?;',
     [chiave]
@@ -802,7 +854,11 @@ async function leggiStato(db: SQLiteDatabase, chiave: string): Promise<string | 
   return riga?.valore ?? null;
 }
 
-async function scriviStato(db: SQLiteDatabase, chiave: string, valore: string): Promise<void> {
+async function scriviStato(
+  db: SQLiteDatabase,
+  chiave: string,
+  valore: string
+): Promise<void> {
   await db.runAsync(
     `INSERT INTO sync_stato (chiave, valore) VALUES (?, ?)
      ON CONFLICT(chiave) DO UPDATE SET valore = excluded.valore;`,

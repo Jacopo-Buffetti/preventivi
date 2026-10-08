@@ -1,19 +1,14 @@
 import { Feather } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import { FONT, useTema } from '../../constants/tema';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { useTema } from '../../constants/tema';
 import {
   getProfiloFabbro,
   updateProfiloFabbro,
 } from '../../services/databaseService';
 import { avviso } from '../../utils/dialoghi';
 import { FormInput } from '../ui/FormInput';
+import { styles } from './ProfiloForm.styles';
 
 // Dati dell'officina: compaiono sui preventivi (PDF) e servono a
 // completare il biglietto da visita.
@@ -202,20 +197,3 @@ export function ProfiloForm() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  centro: { paddingVertical: 40, alignItems: 'center' },
-  affiancati: { flexDirection: 'row', gap: 12 },
-  flex: { flex: 1 },
-  salva: {
-    height: 56,
-    borderRadius: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: 4,
-  },
-  salvaTesto: { fontSize: 16, fontFamily: FONT.pieno },
-  premuto: { opacity: 0.85, transform: [{ scale: 0.98 }] },
-});

@@ -1,0 +1,168 @@
+import { StyleSheet } from 'react-native';
+import { FONT } from '../../constants/tema';
+
+export const styles = StyleSheet.create({
+  container: { flex: 1 },
+  centro: { alignItems: 'center', justifyContent: 'center' },
+
+  barra: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingBottom: 8,
+    width: '100%',
+    maxWidth: 720,
+    alignSelf: 'center',
+  },
+  annulla: {
+    width: 80,
+    height: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  annullaTesto: { fontSize: 15, fontFamily: FONT.semi },
+  titoloBarra: { fontSize: 17, fontFamily: FONT.pieno },
+
+  contenuto: {
+    paddingHorizontal: 20,
+    gap: 24,
+    width: '100%',
+    maxWidth: 720,
+    alignSelf: 'center',
+  },
+
+  info: { gap: 2, marginTop: 4 },
+  infoTesto: { fontSize: 13, fontFamily: FONT.regolare },
+
+  sezione: { gap: 10 },
+  testaSezione: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  titoloSezione: { fontSize: 16, fontFamily: FONT.pieno },
+  contatore: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 },
+  contatoreTesto: { fontSize: 12, fontFamily: FONT.grassetto },
+
+  scelta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+    paddingLeft: 12,
+    borderRadius: 18,
+    borderWidth: 1,
+    minHeight: 68,
+  },
+  tratteggiato: { borderStyle: 'dashed', borderWidth: 1.5 },
+  sceltaTesti: { flex: 1, minWidth: 0, gap: 2 },
+  sceltaTitolo: { fontSize: 16, fontFamily: FONT.grassetto },
+  sceltaSotto: { fontSize: 13, fontFamily: FONT.regolare },
+  cambia: { fontSize: 14, fontFamily: FONT.grassetto },
+
+  input: {
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    minHeight: 48,
+    paddingVertical: 12,
+    fontSize: 16,
+    fontFamily: FONT.regolare,
+  },
+
+  card: { borderRadius: 18, borderWidth: 1, overflow: 'hidden' },
+  voce: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingRight: 12,
+    borderBottomWidth: 1,
+  },
+  voceTocco: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 14,
+    paddingLeft: 16,
+  },
+  voceTesti: { flex: 1, minWidth: 0, gap: 3 },
+  voceDescrizione: { fontSize: 15, fontFamily: FONT.grassetto },
+  voceMeta: {
+    fontSize: 13,
+    fontFamily: FONT.regolare,
+    fontVariant: ['tabular-nums'],
+  },
+  voceTotale: {
+    fontSize: 15,
+    fontFamily: FONT.grassetto,
+    fontVariant: ['tabular-nums'],
+  },
+  iconaPiccola: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconaRiquadro: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  aggiungi: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 52,
+  },
+  aggiungiTesto: { fontSize: 15, fontFamily: FONT.grassetto },
+
+  totali: {
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 6,
+  },
+  rigaTotale: { flexDirection: 'row', justifyContent: 'space-between' },
+  rigaTesto: { fontSize: 14, fontFamily: FONT.regolare },
+  cifre: { fontVariant: ['tabular-nums'] },
+
+  barraSalva: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    borderTopWidth: 1,
+  },
+  totaleBox: { flex: 1, minWidth: 0 },
+  totaleEtichetta: { fontSize: 12, fontFamily: FONT.regolare },
+  totaleValore: {
+    fontSize: 22,
+    fontFamily: FONT.pieno,
+    fontVariant: ['tabular-nums'],
+  },
+  arrotonda: {
+    alignSelf: 'flex-start',
+    marginTop: 6,
+    height: 32,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    justifyContent: 'center',
+  },
+  arrotondaTesto: { fontSize: 13, fontFamily: FONT.grassetto },
+  salva: {
+    height: 56,
+    paddingHorizontal: 22,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 150,
+  },
+  salvaTesto: { fontSize: 16, fontFamily: FONT.pieno },
+
+  disabilitato: { opacity: 0.6 },
+  premuto: { opacity: 0.85, transform: [{ scale: 0.98 }] },
+});

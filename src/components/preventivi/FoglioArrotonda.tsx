@@ -1,12 +1,5 @@
 import { useEffect, useState } from 'react';
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { FONT, useTema, type Tema } from '../../constants/tema';
 import {
   formattaEuro,
@@ -16,6 +9,7 @@ import {
   proposteArrotondamento,
 } from '../../utils/formato';
 import { FoglioInBasso } from '../ui/FoglioInBasso';
+import { styles } from './FoglioArrotonda.styles';
 
 interface Props {
   visibile: boolean;
@@ -240,72 +234,3 @@ function numeroInTesto(valore: number): string {
 function formattaEuroIntero(valore: number): string {
   return `€ ${valore.toLocaleString('it-IT')}`;
 }
-
-const styles = StyleSheet.create({
-  riquadro: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 14,
-  },
-  riquadroEtichetta: { fontSize: 14, fontFamily: FONT.semi },
-  riquadroValore: {
-    fontSize: 18,
-    fontFamily: FONT.pieno,
-    fontVariant: ['tabular-nums'],
-  },
-  etichetta: {
-    fontSize: 13,
-    fontFamily: FONT.grassetto,
-    marginTop: 14,
-    marginBottom: 6,
-  },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: {
-    height: 40,
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 16,
-    justifyContent: 'center',
-  },
-  chipTesto: { fontSize: 15, fontVariant: ['tabular-nums'] },
-  input: {
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    minHeight: 48,
-    paddingVertical: 12,
-    fontSize: 16,
-    fontFamily: FONT.regolare,
-  },
-  cifre: { fontVariant: ['tabular-nums'] },
-  anteprima: {
-    marginTop: 18,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 14,
-    gap: 6,
-  },
-  rigaAnteprima: { flexDirection: 'row', justifyContent: 'space-between' },
-  testoAnteprima: { fontSize: 14, fontFamily: FONT.regolare },
-  totaleAnteprima: { fontSize: 16, fontFamily: FONT.pieno },
-  bottone: {
-    height: 56,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 16,
-  },
-  bottoneTesto: { fontSize: 16, fontFamily: FONT.pieno },
-  togli: {
-    height: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 4,
-  },
-  togliTesto: { fontSize: 15, fontFamily: FONT.grassetto },
-  disabilitato: { opacity: 0.45 },
-  premuto: { opacity: 0.85, transform: [{ scale: 0.98 }] },
-});

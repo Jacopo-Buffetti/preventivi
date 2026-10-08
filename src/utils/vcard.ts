@@ -22,7 +22,7 @@ function piega(riga: string): string {
   return parti.join('\r\n');
 }
 
-// "Giacomo D'Ignazio" → nome "Giacomo", cognome "D'Ignazio".
+// "Mario Rossi" → nome "Mario", cognome "Rossi".
 // Con più parole, l'ultima è il cognome e le altre il nome.
 function dividiNome(completo: string): { nome: string; cognome: string } {
   const parole = completo.trim().split(/\s+/);
@@ -76,7 +76,7 @@ export function creaVCard(b: Biglietto): string {
   return righe.map(piega).join('\r\n') + '\r\n';
 }
 
-// Nome del file senza caratteri problematici: "Giacomo D'Ignazio" → "Giacomo_DIgnazio.vcf"
+// Nome del file senza caratteri problematici: "Mario D'Angelo" → "Mario_DAngelo.vcf"
 export function nomeFileVCard(b: Biglietto): string {
   const base = (b.nome ?? 'contatto')
     .normalize('NFD')

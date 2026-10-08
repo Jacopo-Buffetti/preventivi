@@ -239,6 +239,7 @@ interface RigaPreventivo {
   note_pagamento: string | null;
   totale_imponibile: number;
   totale_iva: number;
+  sconto: number;
   totale_generale: number;
   updated_at: string | null;
   deleted_at: string | null;
@@ -282,6 +283,7 @@ async function inviaPreventivi(db: SQLiteDatabase): Promise<number> {
       note_pagamento: p.note_pagamento,
       totale_imponibile: p.totale_imponibile,
       totale_iva: p.totale_iva,
+      sconto: p.sconto ?? 0,
       totale_generale: p.totale_generale,
       voci,
       updated_at: p.updated_at ?? adesso(),
@@ -582,6 +584,7 @@ interface PreventivoServer {
   note_pagamento: string | null;
   totale_imponibile: number;
   totale_iva: number;
+  sconto: number | null; // null se arriva da prima della migrazione 003
   totale_generale: number;
   voci: RigaVoce[] | null;
   updated_at: string;
@@ -601,9 +604,9 @@ async function applicaPreventivo(db: SQLiteDatabase, p: PreventivoServer): Promi
     await db.runAsync(
       `INSERT INTO preventivi
          (id, cliente_id, numero_preventivo, anno, data_creazione, oggetto, stato,
-          aliquota_iva, note_pagamento, totale_imponibile, totale_iva, totale_generale,
+          aliquota_iva, note_pagamento, totale_imponibile, totale_iva, sconto, totale_generale,
           updated_at, deleted_at, da_sincronizzare)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
        ON CONFLICT(id) DO UPDATE SET
          cliente_id = excluded.cliente_id,
          numero_preventivo = excluded.numero_preventivo,
@@ -615,6 +618,7 @@ async function applicaPreventivo(db: SQLiteDatabase, p: PreventivoServer): Promi
          note_pagamento = excluded.note_pagamento,
          totale_imponibile = excluded.totale_imponibile,
          totale_iva = excluded.totale_iva,
+         sconto = excluded.sconto,
          totale_generale = excluded.totale_generale,
          updated_at = excluded.updated_at,
          deleted_at = excluded.deleted_at,
@@ -631,6 +635,7 @@ async function applicaPreventivo(db: SQLiteDatabase, p: PreventivoServer): Promi
         p.note_pagamento,
         Number(p.totale_imponibile),
         Number(p.totale_iva),
+        Number(p.sconto ?? 0),
         Number(p.totale_generale),
         isoLocale(p.updated_at),
         isoLocale(p.deleted_at),

@@ -77,6 +77,7 @@ create table if not exists preventivi (
   note_pagamento    text,
   totale_imponibile numeric(12, 2) not null default 0,
   totale_iva        numeric(12, 2) not null default 0,
+  sconto            numeric(12, 2) not null default 0,  -- arrotondamento (migrazione 003)
   totale_generale   numeric(12, 2) not null default 0,
   voci              jsonb not null default '[]'::jsonb,
   updated_at        timestamptz not null,

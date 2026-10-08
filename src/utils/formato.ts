@@ -34,6 +34,30 @@ export function formattaEuro(valore: number): string {
   })}`;
 }
 
+// Percentuale dello sconto sul totale con IVA, es. 4 su 244 → 1,639...
+export function percentualeSconto(sconto: number, totaleConIva: number): number {
+  if (totaleConIva <= 0) return 0;
+  return (sconto / totaleConIva) * 100;
+}
+
+// 1.6393 → "1,64%"
+export function formattaPercentuale(valore: number): string {
+  return `${valore.toLocaleString('it-IT', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}%`;
+}
+
+// Proposte di arrotondamento per difetto: alla decina, alla cinquantina e al
+// centinaio sotto il totale. Solo quelle che danno davvero uno sconto,
+// senza doppioni. Es. 244 → [240, 200]; 1.287,50 → [1.280, 1.250, 1.200]
+export function proposteArrotondamento(totale: number): number[] {
+  const proposte = [10, 50, 100]
+    .map((passo) => Math.floor(totale / passo) * passo)
+    .filter((v) => v > 0 && v < totale);
+  return [...new Set(proposte)];
+}
+
 // Converte un testo digitato ("1,5" o "1.5") in numero. Restituisce null se non valido.
 export function leggiNumero(testo: string): number | null {
   const pulito = testo.trim().replace(',', '.');

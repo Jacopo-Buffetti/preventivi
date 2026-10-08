@@ -1,5 +1,3 @@
-import { LOGO_DATA_URI } from './logo';
-
 export interface RigaPdf {
   descrizione: string;
   dettagli?: string;
@@ -13,6 +11,9 @@ export interface DatiPdfPreventivo {
   data: string;
   oggetto: string;
   validitaGiorni: number;
+  // Logo del biglietto da visita (data URI). Senza logo l'intestazione
+  // resta vuota a sinistra.
+  logo?: string;
 
   cliente: {
     nome: string;
@@ -36,7 +37,13 @@ export interface DatiPdfPreventivo {
   imponibile: string;
   ivaPercentuale: number;
   iva: string;
-  totale: string;
+  totale: string; // totale da pagare (già arrotondato, se c'è lo sconto)
+  // Solo se il totale è stato arrotondato
+  arrotondamento?: {
+    totaleConIva: string;
+    sconto: string;
+    percentuale: string; // es. "1,64%"
+  };
 
   note?: string;
   modalitaPagamento: string;
@@ -115,7 +122,7 @@ export function htmlPreventivo(d: DatiPdfPreventivo): string {
 
     <header class="header">
       <div class="brand">
-        <img src="${LOGO_DATA_URI}" alt="${esc(a.nome)}" class="logo">
+        ${d.logo ? `<img src="${esc(d.logo)}" alt="${esc(a.nome)}" class="logo">` : ''}
       </div>
 
       <div class="document-meta">
@@ -186,6 +193,18 @@ export function htmlPreventivo(d: DatiPdfPreventivo): string {
           <span>IVA ${d.ivaPercentuale}%</span>
           <strong>€ ${esc(d.iva)}</strong>
         </div>
+        ${
+          d.arrotondamento
+            ? `<div class="summary-row">
+          <span>Totale con IVA</span>
+          <strong>€ ${esc(d.arrotondamento.totaleConIva)}</strong>
+        </div>
+        <div class="summary-row">
+          <span>Sconto ${esc(d.arrotondamento.percentuale)}</span>
+          <strong>− € ${esc(d.arrotondamento.sconto)}</strong>
+        </div>`
+            : ''
+        }
         <div class="summary-total">
           <span>TOTALE</span>
           <strong>€ ${esc(d.totale)}</strong>
@@ -239,7 +258,7 @@ export function htmlPreventivo(d: DatiPdfPreventivo): string {
 </html>`;
 }
 
-// Stile del template, invariato rispetto a preventivo.html
+// Stile del template
 const CSS = `
     @page {
       size: A4;

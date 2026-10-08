@@ -49,8 +49,10 @@ import {
   formattaData,
   formattaEuro,
   formattaNumeroPreventivo,
+  formattaPercentuale,
   nomeFilePreventivo,
   numeroWhatsApp,
+  percentualeSconto,
 } from '../../utils/formato';
 
 export default function DettaglioPreventivoScreen() {
@@ -430,7 +432,7 @@ export default function DettaglioPreventivoScreen() {
             <Text
               style={[styles.data, { color: t.testoIntestazioneSecondario }]}
             >
-              Totale con IVA
+              {preventivo.sconto > 0 ? 'Totale arrotondato' : 'Totale con IVA'}
             </Text>
             <Text style={[styles.totaleGrande, { color: t.testoIntestazione }]}>
               {formattaEuro(preventivo.totale_generale)}
@@ -614,6 +616,27 @@ export default function DettaglioPreventivoScreen() {
                   etichetta={`IVA ${preventivo.aliquota_iva}%`}
                   valore={formattaEuro(preventivo.totale_iva)}
                 />
+                {preventivo.sconto > 0 && (
+                  <>
+                    <RigaTotale
+                      t={t}
+                      etichetta="Totale con IVA"
+                      valore={formattaEuro(
+                        preventivo.totale_imponibile + preventivo.totale_iva
+                      )}
+                    />
+                    <RigaTotale
+                      t={t}
+                      etichetta={`Sconto arrotondamento (${formattaPercentuale(
+                        percentualeSconto(
+                          preventivo.sconto,
+                          preventivo.totale_imponibile + preventivo.totale_iva
+                        )
+                      )})`}
+                      valore={`− ${formattaEuro(preventivo.sconto)}`}
+                    />
+                  </>
+                )}
                 <View
                   style={[
                     styles.rigaTotale,

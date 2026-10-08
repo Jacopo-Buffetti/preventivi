@@ -102,14 +102,14 @@ export function ProfiloForm() {
     <View>
       <FormInput
         label="Nome dell'attività *"
-        placeholder="es. Giacomo D'Ignazio"
+        placeholder="es. Officina Rossi"
         value={nomeAzienda}
         onChangeText={campo(setNomeAzienda)}
         aiuto="Compare in testa a ogni preventivo."
       />
       <FormInput
         label="Titolare"
-        placeholder="es. Giacomo D'Ignazio"
+        placeholder="es. Mario Rossi"
         value={titolare}
         onChangeText={campo(setTitolare)}
         autoCapitalize="words"
@@ -117,20 +117,20 @@ export function ProfiloForm() {
       />
       <FormInput
         label="Indirizzo dell'officina"
-        placeholder="es. Via Roma 12, Terni"
+        placeholder="es. Via Roma 1, 00100 Città"
         value={indirizzo}
         onChangeText={campo(setIndirizzo)}
       />
       <FormInput
         label="Telefono"
-        placeholder="es. 333 123 4567"
+        placeholder="es. 333 000 0000"
         keyboardType="phone-pad"
         value={telefono}
         onChangeText={campo(setTelefono)}
       />
       <FormInput
         label="Email"
-        placeholder="es. info@officina.it"
+        placeholder="es. info@esempio.it"
         keyboardType="email-address"
         autoCapitalize="none"
         autoCorrect={false}
@@ -141,7 +141,7 @@ export function ProfiloForm() {
         <View style={styles.flex}>
           <FormInput
             label="Partita IVA"
-            placeholder="12345678901"
+            placeholder="00000000000"
             keyboardType="numeric"
             value={pIva}
             onChangeText={campo(setPIva)}

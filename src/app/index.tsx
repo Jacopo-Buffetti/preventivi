@@ -22,6 +22,7 @@ import {
   type Tema,
 } from '../constants/tema';
 import { useCaricaQuandoVisibile } from '../hooks/useCaricaQuandoVisibile';
+import { getBiglietto } from '../services/bigliettoService';
 import {
   getAllPreventivi,
   getProfiloFabbro,
@@ -60,6 +61,8 @@ export default function HomeScreen() {
   const { aggiornando, aggiorna } = useTiraPerAggiornare();
 
   const [profilo, setProfilo] = useState<ProfiloFabbro | null>(null);
+  // Logo caricato nel biglietto da visita: finché non c'è, nessun logo
+  const [logo, setLogo] = useState<string | null>(null);
   const [preventivi, setPreventivi] = useState<Preventivo[]>([]);
   const [caricato, setCaricato] = useState(false);
 
@@ -75,10 +78,11 @@ export default function HomeScreen() {
 
   // Ricarica quando la Home torna visibile e quando arrivano dati nuovi
   useCaricaQuandoVisibile(() => {
-    Promise.all([getProfiloFabbro(), getAllPreventivi()])
-      .then(([p, lista]) => {
+    Promise.all([getProfiloFabbro(), getAllPreventivi(), getBiglietto()])
+      .then(([p, lista, biglietto]) => {
         setProfilo(p);
         setPreventivi(lista);
+        setLogo(biglietto?.logo || null);
       })
       .catch((err) => console.error('Errore caricamento Home:', err))
       .finally(() => setCaricato(true));
@@ -130,12 +134,15 @@ export default function HomeScreen() {
           />
 
           <View style={styles.rigaMarchio}>
-            <Image
-              source={require('../../assets/images/logo.png')}
-              style={styles.logo}
-              resizeMode="contain"
-              accessibilityLabel="Logo"
-            />
+            {/* Il logo è quello del biglietto da visita: senza logo, niente riquadro */}
+            {logo && (
+              <Image
+                source={{ uri: logo }}
+                style={styles.logo}
+                resizeMode="contain"
+                accessibilityLabel="Logo"
+              />
+            )}
             <View style={styles.marchioTesti}>
               <Text
                 style={[styles.nomeAttivita, { color: t.testoIntestazione }]}
@@ -743,7 +750,7 @@ function nomeMese(): string {
   return mese.charAt(0).toUpperCase() + mese.slice(1);
 }
 
-// "Giacomo D'Ignazio" → "Giacomo"
+// "Mario Rossi" → "Mario"
 function primoNome(nome?: string | null): string | null {
   const pulito = nome?.trim();
   return pulito ? pulito.split(/\s+/)[0] : null;

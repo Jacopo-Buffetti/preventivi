@@ -158,7 +158,7 @@ export default function NuovoClienteScreen() {
           label="Telefono"
           value={telefono}
           onChangeText={setTelefono}
-          placeholder="es. 333 123 4567"
+          placeholder="es. 333 000 0000"
           keyboardType="phone-pad"
           textContentType="telephoneNumber"
           aiuto="Serve anche per inviare i preventivi su WhatsApp."
@@ -167,7 +167,7 @@ export default function NuovoClienteScreen() {
           label="Email"
           value={email}
           onChangeText={setEmail}
-          placeholder="es. mario.rossi@email.it"
+          placeholder="es. mario.rossi@esempio.it"
           keyboardType="email-address"
           autoCapitalize="none"
           autoCorrect={false}
@@ -177,7 +177,7 @@ export default function NuovoClienteScreen() {
           label="Indirizzo"
           value={indirizzo}
           onChangeText={setIndirizzo}
-          placeholder="es. Via Roma 12, Narni"
+          placeholder="es. Via Roma 1, 00100 Città"
           textContentType="fullStreetAddress"
           aiuto="Compare sul preventivo."
         />

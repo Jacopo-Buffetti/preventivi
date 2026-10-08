@@ -1,11 +1,11 @@
 import { adesso, getDbConnection } from './db';
 import { segnalaModificaLocale } from './eventiSync';
 import { nuovoId } from './id';
-import type { PreventivoInput } from './databaseService';
+import { scontoValido, type PreventivoInput } from './databaseService';
 
 // Aggiorna un preventivo esistente con le sue voci.
 // Restano invariati numero, anno, data di emissione e stato: cambiano cliente,
-// oggetto, note, voci e totali. Le voci vecchie vengono sostituite da quelle nuove.
+// oggetto, note, voci, sconto di arrotondamento e totali. Le voci vecchie vengono sostituite da quelle nuove.
 // Il preventivo viene marcato da sincronizzare: le voci non hanno un flag
 // proprio, viaggiano sempre insieme al loro preventivo.
 export async function updatePreventivoWithVoci(
@@ -22,14 +22,15 @@ export async function updatePreventivoWithVoci(
     return { ...v, totaleVoce };
   });
   const totaleIva = (imponibile * aliquotaIva) / 100;
-  const totaleGenerale = imponibile + totaleIva;
+  const sconto = scontoValido(input.sconto, imponibile + totaleIva);
+  const totaleGenerale = imponibile + totaleIva - sconto;
 
   // Tutto in una transazione: o si salva tutto, o non cambia niente
   await db.withTransactionAsync(async () => {
     await db.runAsync(
       `UPDATE preventivi
        SET cliente_id = ?, oggetto = ?, aliquota_iva = ?, note_pagamento = ?,
-           totale_imponibile = ?, totale_iva = ?, totale_generale = ?,
+           totale_imponibile = ?, totale_iva = ?, sconto = ?, totale_generale = ?,
            updated_at = ?, da_sincronizzare = 1
        WHERE id = ?;`,
       [
@@ -39,6 +40,7 @@ export async function updatePreventivoWithVoci(
         input.note_pagamento || '',
         imponibile,
         totaleIva,
+        sconto,
         totaleGenerale,
         adesso(),
         idPreventivo,

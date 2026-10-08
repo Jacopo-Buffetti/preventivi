@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FoglioArrotonda } from '../../components/preventivi/FoglioArrotonda';
 import {
   FoglioNuovaVoce,
   type NuovaVoce,
@@ -31,6 +32,8 @@ import {
   formattaData,
   formattaEuro,
   formattaNumeroPreventivo,
+  formattaPercentuale,
+  percentualeSconto,
 } from '../../utils/formato';
 
 const ALIQUOTA_IVA = 22;
@@ -61,9 +64,12 @@ export default function NuovoPreventivoScreen() {
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [oggetto, setOggetto] = useState('');
   const [voci, setVoci] = useState<VoceInLista[]>([]);
+  // Sconto di arrotondamento in euro (0 = totale non arrotondato)
+  const [sconto, setSconto] = useState(0);
 
   const [selettoreAperto, setSelettoreAperto] = useState(false);
   const [foglioAperto, setFoglioAperto] = useState(false);
+  const [arrotondaAperto, setArrotondaAperto] = useState(false);
   const [voceInModifica, setVoceInModifica] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [caricamento, setCaricamento] = useState(inModifica);
@@ -88,6 +94,7 @@ export default function NuovoPreventivoScreen() {
         setAliquotaIva(p.aliquota_iva);
         setNote(p.note_pagamento ?? '');
         setOggetto(p.oggetto ?? '');
+        setSconto(p.sconto ?? 0);
         setVoci(
           vociSalvate.map((v) => ({
             chiave: v.id,
@@ -130,18 +137,27 @@ export default function NuovoPreventivoScreen() {
     0
   );
   const iva = (imponibile * aliquotaIva) / 100;
-  const totale = imponibile + iva;
+  const totaleConIva = imponibile + iva;
+  const totale = totaleConIva - sconto;
+
+  // Se cambiano le voci, il vecchio arrotondamento non ha più senso
+  // (240 era giusto per 244, non per il nuovo totale): si toglie e,
+  // se serve, si rifà con il pulsante "Arrotonda".
+  const cambiaVoci = (aggiorna: (attuali: VoceInLista[]) => VoceInLista[]) => {
+    setVoci(aggiorna);
+    setSconto(0);
+  };
 
   // Il foglio serve sia ad aggiungere una voce sia a modificarne una esistente
   const confermaVoce = (voce: NuovaVoce) => {
     if (voceInModifica) {
-      setVoci((attuali) =>
+      cambiaVoci((attuali) =>
         attuali.map((v) =>
           v.chiave === voceInModifica ? { ...voce, chiave: v.chiave } : v
         )
       );
     } else {
-      setVoci((attuali) => [
+      cambiaVoci((attuali) => [
         ...attuali,
         { ...voce, chiave: `${Date.now()}-${attuali.length}` },
       ]);
@@ -168,7 +184,7 @@ export default function NuovoPreventivoScreen() {
     voci.find((v) => v.chiave === voceInModifica) ?? null;
 
   const rimuoviVoce = (chiave: string) =>
-    setVoci((attuali) => attuali.filter((v) => v.chiave !== chiave));
+    cambiaVoci((attuali) => attuali.filter((v) => v.chiave !== chiave));
 
   const salva = async () => {
     if (!cliente) {
@@ -185,6 +201,7 @@ export default function NuovoPreventivoScreen() {
       oggetto: oggetto.trim(),
       aliquota_iva: aliquotaIva,
       note_pagamento: note,
+      sconto,
       voci: voci.map(({ descrizione, quantita, prezzo_unitario }) => ({
         descrizione,
         quantita,
@@ -444,6 +461,22 @@ export default function NuovoPreventivoScreen() {
                 valore={formattaEuro(iva)}
                 t={t}
               />
+              {sconto > 0 && (
+                <>
+                  <RigaTotale
+                    etichetta="Totale con IVA"
+                    valore={formattaEuro(totaleConIva)}
+                    t={t}
+                  />
+                  <RigaTotale
+                    etichetta={`Sconto arrotondamento (${formattaPercentuale(
+                      percentualeSconto(sconto, totaleConIva)
+                    )})`}
+                    valore={`− ${formattaEuro(sconto)}`}
+                    t={t}
+                  />
+                </>
+              )}
             </View>
           )}
         </Sezione>
@@ -462,7 +495,7 @@ export default function NuovoPreventivoScreen() {
       >
         <View style={styles.totaleBox}>
           <Text style={[styles.totaleEtichetta, { color: t.testoSecondario }]}>
-            Totale con IVA
+            {sconto > 0 ? 'Totale arrotondato' : 'Totale con IVA'}
           </Text>
           <Text
             style={[styles.totaleValore, { color: t.testo }]}
@@ -471,6 +504,26 @@ export default function NuovoPreventivoScreen() {
           >
             {formattaEuro(totale)}
           </Text>
+          {/* Arrotonda: solo se c'è qualcosa da arrotondare */}
+          {voci.length > 0 && totaleConIva > 0 && (
+            <Pressable
+              onPress={() => setArrotondaAperto(true)}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={
+                sconto > 0 ? 'Modifica arrotondamento' : 'Arrotonda il totale'
+              }
+              style={({ pressed }) => [
+                styles.arrotonda,
+                { borderColor: t.accento },
+                pressed && styles.premuto,
+              ]}
+            >
+              <Text style={[styles.arrotondaTesto, { color: t.accento }]}>
+                {sconto > 0 ? 'Modifica arrotondamento' : 'Arrotonda'}
+              </Text>
+            </Pressable>
+          )}
         </View>
         <Pressable
           onPress={salva}
@@ -499,6 +552,16 @@ export default function NuovoPreventivoScreen() {
         onScegli={(c) => {
           setCliente(c);
           setSelettoreAperto(false);
+        }}
+      />
+      <FoglioArrotonda
+        visibile={arrotondaAperto}
+        totaleConIva={totaleConIva}
+        scontoAttuale={sconto}
+        onChiudi={() => setArrotondaAperto(false)}
+        onApplica={(nuovoSconto) => {
+          setSconto(nuovoSconto);
+          setArrotondaAperto(false);
         }}
       />
       <FoglioNuovaVoce
@@ -709,6 +772,16 @@ const styles = StyleSheet.create({
     fontFamily: FONT.pieno,
     fontVariant: ['tabular-nums'],
   },
+  arrotonda: {
+    alignSelf: 'flex-start',
+    marginTop: 6,
+    height: 32,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    justifyContent: 'center',
+  },
+  arrotondaTesto: { fontSize: 13, fontFamily: FONT.grassetto },
   salva: {
     height: 56,
     paddingHorizontal: 22,

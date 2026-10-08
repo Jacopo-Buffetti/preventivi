@@ -63,7 +63,7 @@ export function SchermataLogin() {
         keyboardShouldPersistTaps="handled"
       >
         <Image
-          source={require('../../../assets/images/logo.png')}
+          source={require('../../../assets/images/app-logo.png')}
           style={styles.logo}
           resizeMode="contain"
         />
@@ -147,14 +147,13 @@ const styles = StyleSheet.create({
     maxWidth: 480,
     alignSelf: 'center',
   },
-  // Il logo è disegnato in blu notte: sul tema scuro sparirebbe, quindi
-  // sta sempre su un riquadro bianco, come nella Home
+  // Il logo dell'app ha già il suo sfondo scuro: basta arrotondare gli
+  // angoli, come un'icona
   logo: {
     width: 140,
     height: 140,
     alignSelf: 'center',
     marginBottom: 28,
-    backgroundColor: '#FFFFFF',
     borderRadius: 32,
   },
   titolo: {

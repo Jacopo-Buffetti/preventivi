@@ -127,6 +127,12 @@ async function apriEInizializza(): Promise<SQLite.SQLiteDatabase> {
   // Migrazione: numero_preventivo facoltativo (le bozze non hanno numero)
   await rendiNumeroFacoltativo(db);
 
+  // Migrazione: sconto di arrotondamento sul totale con IVA (in euro).
+  // Va DOPO rendiNumeroFacoltativo: quella ricostruisce la tabella con un
+  // elenco fisso di colonne e, se venisse prima, perderebbe questa.
+  // Default 0 = nessun arrotondamento, quindi i preventivi vecchi non cambiano.
+  await aggiungiColonnaSeManca(db, 'preventivi', 'sconto', 'REAL NOT NULL DEFAULT 0');
+
   // 6. Stato della sincronizzazione: piccola tabella "chiave → valore".
   // Contiene, per esempio:
   //   utente        → id dell'utente a cui appartengono i dati di questo dispositivo

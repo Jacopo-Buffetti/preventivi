@@ -366,7 +366,7 @@ export default function BigliettoScreen() {
         <Sezione t={t} titolo="Fronte">
           <FormInput
             label="Descrizione attività"
-            placeholder="es. Serrature, cancelli, inferriate"
+            placeholder="es. Installazioni e riparazioni"
             value={dati.descrizione_fronte ?? ''}
             onChangeText={aggiorna('descrizione_fronte')}
             onFocus={() => setLato('fronte')}
@@ -388,28 +388,28 @@ export default function BigliettoScreen() {
           </Text>
           <FormInput
             label="Nome attività *"
-            placeholder="es. Giacomo D'Ignazio"
+            placeholder="es. Officina Rossi"
             value={dati.nome ?? ''}
             onChangeText={aggiorna('nome')}
             onFocus={() => setLato('retro')}
           />
           <FormInput
             label="Qualifica"
-            placeholder="es. Titolare, Fabbro, Tecnico"
+            placeholder="es. Titolare, Tecnico"
             value={dati.qualifica ?? ''}
             onChangeText={aggiorna('qualifica')}
             aiuto="Non compare sul biglietto: va solo nel contatto condiviso."
           />
           <FormInput
             label="Descrizione retro"
-            placeholder="es. Fabbro, sicurezza su misura"
+            placeholder="es. Lavori su misura"
             value={dati.descrizione_retro ?? ''}
             onChangeText={aggiorna('descrizione_retro')}
             onFocus={() => setLato('retro')}
           />
           <FormInput
             label="Indirizzo *"
-            placeholder="es. Via Roma 12, Terni"
+            placeholder="es. Via Roma 1, 00100 Città"
             value={dati.indirizzo ?? ''}
             onChangeText={aggiorna('indirizzo')}
             onFocus={() => setLato('retro')}
@@ -418,7 +418,7 @@ export default function BigliettoScreen() {
             <View style={styles.flex}>
               <FormInput
                 label="Telefono *"
-                placeholder="0744 123456"
+                placeholder="0123 456789"
                 keyboardType="phone-pad"
                 value={dati.telefono ?? ''}
                 onChangeText={aggiorna('telefono')}
@@ -428,7 +428,7 @@ export default function BigliettoScreen() {
             <View style={styles.flex}>
               <FormInput
                 label="Cellulare"
-                placeholder="333 1234567"
+                placeholder="333 0000000"
                 keyboardType="phone-pad"
                 value={dati.cellulare ?? ''}
                 onChangeText={aggiorna('cellulare')}
@@ -438,7 +438,7 @@ export default function BigliettoScreen() {
           </View>
           <FormInput
             label="Email *"
-            placeholder="info@officina.it"
+            placeholder="info@esempio.it"
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
@@ -448,7 +448,7 @@ export default function BigliettoScreen() {
           />
           <FormInput
             label="Email secondaria"
-            placeholder="pec@officina.it"
+            placeholder="pec@esempio.it"
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
@@ -460,7 +460,7 @@ export default function BigliettoScreen() {
             <View style={styles.flex}>
               <FormInput
                 label="P.IVA"
-                placeholder="01234567890"
+                placeholder="00000000000"
                 keyboardType="numeric"
                 value={dati.p_iva ?? ''}
                 onChangeText={aggiorna('p_iva')}
@@ -470,7 +470,7 @@ export default function BigliettoScreen() {
             <View style={styles.flex}>
               <FormInput
                 label="REA"
-                placeholder="TR-123456"
+                placeholder="AB-123456"
                 autoCapitalize="characters"
                 value={dati.rea ?? ''}
                 onChangeText={aggiorna('rea')}
@@ -480,7 +480,7 @@ export default function BigliettoScreen() {
           </View>
           <FormInput
             label="Codice fiscale"
-            placeholder="RSSMRA80A01L117X"
+            placeholder="RSSMRA80A01H501U"
             autoCapitalize="characters"
             value={dati.codice_fiscale ?? ''}
             onChangeText={aggiorna('codice_fiscale')}

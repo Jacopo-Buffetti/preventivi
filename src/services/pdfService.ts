@@ -10,8 +10,11 @@ import {
 import {
   formattaData,
   formattaNumeroPreventivo,
+  formattaPercentuale,
   nomeFilePreventivo,
+  percentualeSconto,
 } from '../utils/formato';
+import { getBiglietto } from './bigliettoService';
 import {
   getPreventivoById,
   getProfiloFabbro,
@@ -35,13 +38,17 @@ function importo(valore: number): string {
 async function costruisciDati(
   idPreventivo: string
 ): Promise<{ dati: DatiPdfPreventivo; nomeFile: string }> {
-  const [preventivo, voci, profilo] = await Promise.all([
+  const [preventivo, voci, profilo, biglietto] = await Promise.all([
     getPreventivoById(idPreventivo),
     getVociByPreventivoId(idPreventivo),
     getProfiloFabbro(),
+    getBiglietto(),
   ]);
 
   if (!preventivo) throw new Error(`Preventivo ${idPreventivo} non trovato`);
+
+  const totaleConIva = preventivo.totale_imponibile + preventivo.totale_iva;
+  const sconto = preventivo.sconto ?? 0;
 
   const dati: DatiPdfPreventivo = {
     numero: formattaNumeroPreventivo(
@@ -51,6 +58,7 @@ async function costruisciDati(
     data: formattaData(preventivo.data_creazione),
     oggetto: preventivo.oggetto ?? '',
     validitaGiorni: DOCUMENTO.validitaGiorni,
+    logo: biglietto?.logo || undefined,
 
     cliente: {
       nome: preventivo.cliente_nome ?? 'Cliente',
@@ -80,6 +88,16 @@ async function costruisciDati(
     ivaPercentuale: preventivo.aliquota_iva,
     iva: importo(preventivo.totale_iva),
     totale: importo(preventivo.totale_generale),
+    arrotondamento:
+      sconto > 0
+        ? {
+            totaleConIva: importo(totaleConIva),
+            sconto: importo(sconto),
+            percentuale: formattaPercentuale(
+              percentualeSconto(sconto, totaleConIva)
+            ),
+          }
+        : undefined,
 
     note: preventivo.note_pagamento,
     modalitaPagamento: DOCUMENTO.modalitaPagamento,

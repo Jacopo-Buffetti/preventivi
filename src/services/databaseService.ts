@@ -37,6 +37,8 @@ export interface PreventivoInput {
   oggetto?: string;
   aliquota_iva?: number;
   note_pagamento?: string;
+  // Sconto di arrotondamento in euro, tolto dal totale con IVA (0 = nessuno)
+  sconto?: number;
   stato?: StatoPreventivo;
   voci: VocePreventivoInput[];
 }
@@ -55,7 +57,8 @@ export interface Preventivo {
   note_pagamento?: string;
   totale_imponibile: number;
   totale_iva: number;
-  totale_generale: number;
+  sconto: number; // arrotondamento in euro, già tolto da totale_generale
+  totale_generale: number; // totale da pagare: imponibile + IVA - sconto
 }
 
 export interface VocePreventivo {
@@ -221,6 +224,17 @@ export async function deleteCliente(id: string): Promise<void> {
 
 // --- PREVENTIVI ---
 
+// Lo sconto di arrotondamento: arrotondato al centesimo, mai negativo e mai
+// più grande del totale con IVA. Un valore assurdo diventa 0.
+export function scontoValido(
+  sconto: number | undefined,
+  totaleConIva: number
+): number {
+  if (!sconto || !Number.isFinite(sconto) || sconto <= 0) return 0;
+  if (sconto >= totaleConIva) return 0;
+  return Math.round(sconto * 100) / 100;
+}
+
 export async function savePreventivoWithVoci(
   input: PreventivoInput
 ): Promise<string> {
@@ -244,16 +258,17 @@ export async function savePreventivoWithVoci(
   });
 
   const totaleIva = (imponibile * aliquotaIva) / 100;
-  const totaleGenerale = imponibile + totaleIva;
+  const sconto = scontoValido(input.sconto, imponibile + totaleIva);
+  const totaleGenerale = imponibile + totaleIva - sconto;
 
   // Esecuzione in TRANSAZIONE Atomica
   await db.withTransactionAsync(async () => {
     // Inserimento Testata
     await db.runAsync(
       `INSERT INTO preventivi 
-        (id, cliente_id, numero_preventivo, anno, data_creazione, oggetto, stato, aliquota_iva, note_pagamento, totale_imponibile, totale_iva, totale_generale,
+        (id, cliente_id, numero_preventivo, anno, data_creazione, oggetto, stato, aliquota_iva, note_pagamento, totale_imponibile, totale_iva, sconto, totale_generale,
          updated_at, da_sincronizzare)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1);`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1);`,
       [
         preventivoId,
         input.cliente_id,
@@ -266,6 +281,7 @@ export async function savePreventivoWithVoci(
         input.note_pagamento || '',
         imponibile,
         totaleIva,
+        sconto,
         totaleGenerale,
         dataCreazione,
       ]

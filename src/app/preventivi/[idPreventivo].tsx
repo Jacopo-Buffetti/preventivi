@@ -1,6 +1,5 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import * as MailComposer from 'expo-mail-composer';
-import * as Print from 'expo-print';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
@@ -14,13 +13,17 @@ import {
 import {
   ActivityIndicator,
   Linking,
+  NativeModules,
   Platform,
   Pressable,
   ScrollView,
   Text,
+  TurboModuleRegistry,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CopiaFirmata } from '../../components/preventivi/CopiaFirmata';
+import { VisualizzatoreDocumento } from '../../components/ui/VisualizzatoreDocumento';
 import { useCaricaQuandoVisibile } from '../../hooks/useCaricaQuandoVisibile';
 import {
   coloriStato,
@@ -28,6 +31,11 @@ import {
   ORDINE_STATI,
 } from '../../constants/stati';
 import { FONT, useSceltaTema, useTema, type Tema } from '../../constants/tema';
+import {
+  etichettaTotaleConIva,
+  etichettaTotaleFinale,
+} from '../../constants/fisco';
+import { quantitaConUnita } from '../../constants/unita';
 import {
   deletePreventivo,
   getPreventivoById,
@@ -38,10 +46,12 @@ import {
   type VocePreventivo,
 } from '../../services/databaseService';
 import {
-  condividiPdfPreventivo,
-  copiaConNome,
-  generaPdfPreventivo,
-} from '../../services/pdfService';
+  documentoDaInviare,
+  stampaDocumento,
+  type DocumentoPreventivo,
+} from '../../services/documentoPreventivo';
+import { apriConAppEsterna } from '../../services/apriDocumento';
+import { copiaConNome, generaPdfPreventivo } from '../../services/pdfService';
 import { avviso, conferma } from '../../utils/dialoghi';
 import { prontoPerInvio } from '../../utils/invioPreventivo';
 import {
@@ -78,8 +88,10 @@ export default function DettaglioPreventivoScreen() {
   const [voci, setVoci] = useState<VocePreventivo[]>([]);
   const [caricamento, setCaricamento] = useState(true);
   const [generandoPdf, setGenerandoPdf] = useState(false);
+  // PDF aperto nel visualizzatore interno (solo iPhone)
+  const [pdfAperto, setPdfAperto] = useState<DocumentoPreventivo | null>(null);
 
-  useCaricaQuandoVisibile(() => {
+  const carica = () => {
     if (!idPreventivo) return;
     Promise.all([
       getPreventivoById(idPreventivo),
@@ -94,7 +106,9 @@ export default function DettaglioPreventivoScreen() {
         avviso('Errore', 'Impossibile caricare il preventivo.');
       })
       .finally(() => setCaricamento(false));
-  });
+  };
+
+  useCaricaQuandoVisibile(carica);
 
   // Se si arriva qui da un link diretto non c'è una pagina a cui tornare
   const tornaAllaLista = () => {
@@ -125,13 +139,25 @@ export default function DettaglioPreventivoScreen() {
     return pronto;
   };
 
-  const condividi = async () => {
+  // Mostra il PDF del preventivo, così come lo riceve il cliente.
+  // Solo per guardarlo: non assegna il numero a una bozza (che esce con
+  // "Bozza" al posto del numero) e non cambia lo stato.
+  // Android: si apre con il lettore PDF del telefono; iPhone: dentro l'app.
+  const vediPdf = async () => {
     if (!preventivo) return;
     try {
       setGenerandoPdf(true);
-      const p = await preparaInvio();
-      if (!p) return;
-      await condividiPdfPreventivo(p.id);
+      const doc: DocumentoPreventivo = {
+        uri: await generaPdfPreventivo(preventivo.id),
+        mimeType: 'application/pdf',
+        nomeFile: nomeFilePreventivo(
+          preventivo.anno,
+          preventivo.numero_preventivo
+        ),
+        firmato: false,
+      };
+      if (Platform.OS === 'android') await apriConAppEsterna(doc);
+      else setPdfAperto(doc);
     } catch (err) {
       console.error(err);
       avviso('Errore', 'Impossibile generare il PDF del preventivo.');
@@ -140,72 +166,91 @@ export default function DettaglioPreventivoScreen() {
     }
   };
 
-  // Salva il PDF in storage locale e apre la stampa
+  // Messaggio d'errore quando il documento non si riesce a preparare.
+  // Con la copia firmata il caso tipico è un altro dispositivo offline:
+  // il file sta sul server e qui non è ancora stato scaricato.
+  const erroreDocumento = (p: PreventivoConCliente | null) =>
+    p?.firmato_file
+      ? avviso(
+          'Copia firmata non disponibile',
+          'Serve la connessione per scaricare la copia firmata da inviare.'
+        )
+      : avviso('Errore', 'Impossibile generare il PDF del preventivo.');
+
+  // Salva il documento in storage locale e apre la stampa.
+  // Con la copia firmata si salva e si stampa quella (vedi documentoPreventivo.ts)
   const salvaEStampaPdf = async () => {
     if (!preventivo) return;
+    let p: PreventivoConCliente | null = null;
     try {
       setGenerandoPdf(true);
-      const p = await preparaInvio();
+      p = await preparaInvio();
       if (!p) return;
-      const uri = await generaPdfPreventivo(p.id);
+      const doc = await documentoDaInviare(p);
 
-      const filename = nomeFilePreventivo(p.anno, p.numero_preventivo);
-      // Se la copia fallisce si stampa comunque il file generato
-      let daStampare = uri;
+      // Se la copia fallisce si stampa comunque il file preparato
+      let daStampare = doc;
       try {
-        daStampare = await copiaConNome(
-          uri,
+        const salvato = await copiaConNome(
+          doc.uri,
           FileSystem.documentDirectory || FileSystem.cacheDirectory!,
-          filename
+          doc.nomeFile
         );
-        avviso('Salvato', `PDF salvato in ${daStampare}`);
+        daStampare = { ...doc, uri: salvato };
+        avviso('Salvato', `File salvato in ${salvato}`);
       } catch (copyErr) {
         console.warn(
-          'Impossibile salvare il PDF in documentDirectory, uso percorso temporaneo',
+          'Impossibile salvare il file in documentDirectory, uso percorso temporaneo',
           copyErr
         );
       }
 
       // Apri la UI di stampa sul file salvato (se disponibile)
       try {
-        await Print.printAsync({ uri: daStampare });
+        await stampaDocumento(daStampare);
       } catch (printErr) {
         console.error(printErr);
         avviso('Errore', 'Impossibile aprire la stampa.');
       }
     } catch (err) {
       console.error(err);
-      avviso('Errore', 'Impossibile generare il PDF del preventivo.');
+      erroreDocumento(p);
     } finally {
       setGenerandoPdf(false);
     }
   };
 
-  // Condivide il PDF via WhatsApp: apre la chat del cliente con testo
-  // e poi apre il foglio di condivisione per allegare il PDF (miglior fallback).
+  // Condivide il documento via WhatsApp: apre la chat del cliente con testo
+  // e poi apre il foglio di condivisione per allegarlo (miglior fallback).
+  // Con la copia firmata si manda quella al posto del PDF generato.
   const condividiWhatsApp = async () => {
     if (!preventivo) return;
+    let p: PreventivoConCliente | null = null;
     try {
       setGenerandoPdf(true);
-      const p = await preparaInvio();
+      p = await preparaInvio();
       if (!p) return;
-      const uri = await generaPdfPreventivo(p.id);
+      const doc = await documentoDaInviare(p);
+      const uri = doc.uri;
 
       const testo = `Ti invio il preventivo N° ${formattaNumeroPreventivo(
         p.anno,
         p.numero_preventivo
-      )}`;
+      )}${doc.firmato ? ' firmato' : ''}`;
 
       // Preferisci usare `react-native-share` (richiede dev/custom build)
       // per aprire direttamente WhatsApp con allegato.
       try {
         let RNShare: any = null;
-        if (Platform.OS !== 'web') {
+        // Si carica solo se il modulo nativo c'è davvero: in Expo Go non
+        // c'è (react-native-share non è incluso) e il require scriverebbe
+        // un errore rosso nella console anche se poi lo gestiamo.
+        // Nell'app installata invece c'è, e WhatsApp si apre direttamente.
+        if (Platform.OS !== 'web' && shareNativoDisponibile()) {
           try {
-            // require dinamico per evitare crash su web
             // eslint-disable-next-line @typescript-eslint/no-var-requires
             RNShare = require('react-native-share');
-          } catch (e) {
+          } catch {
             RNShare = null;
           }
         }
@@ -214,6 +259,8 @@ export default function DettaglioPreventivoScreen() {
           title: 'Preventivo',
           message: testo,
           url: uri,
+          type: doc.mimeType,
+          filename: doc.nomeFile,
           failOnCancel: false,
         };
 
@@ -232,7 +279,7 @@ export default function DettaglioPreventivoScreen() {
           shareErr
         );
         if (await Sharing.isAvailableAsync()) {
-          await Sharing.shareAsync(uri, { mimeType: 'application/pdf' });
+          await Sharing.shareAsync(uri, { mimeType: doc.mimeType });
         } else {
           // fallback: apri chat WhatsApp con testo (senza allegato) e mostra stampa
           const numero = numeroWhatsApp(preventivo.cliente_telefono || '');
@@ -245,32 +292,35 @@ export default function DettaglioPreventivoScreen() {
               'Numero WhatsApp del cliente non disponibile.'
             );
           }
-          await Print.printAsync({ uri });
+          await stampaDocumento(doc);
         }
       }
     } catch (err) {
       console.error(err);
-      avviso('Errore', 'Impossibile condividere via WhatsApp.');
+      if (p?.firmato_file) erroreDocumento(p);
+      else avviso('Errore', 'Impossibile condividere via WhatsApp.');
     } finally {
       setGenerandoPdf(false);
     }
   };
 
-  // Condivide il PDF via email: apre il composer con allegato quando possibile
+  // Condivide il documento via email: apre il composer con allegato quando
+  // possibile. Con la copia firmata si allega quella al posto del PDF generato.
   const condividiEmail = async () => {
     if (!preventivo) return;
+    let p: PreventivoConCliente | null = null;
     try {
       setGenerandoPdf(true);
-      const p = await preparaInvio();
+      p = await preparaInvio();
       if (!p) return;
-      const uri = await generaPdfPreventivo(p.id);
+      const doc = await documentoDaInviare(p);
+      const uri = doc.uri;
 
+      const numero = formattaNumeroPreventivo(p.anno, p.numero_preventivo);
+      const firmato = doc.firmato ? ' firmato' : '';
       const destinatario = p.cliente_email || '';
-      const subject = `Preventivo ${formattaNumeroPreventivo(p.anno, p.numero_preventivo)}`;
-      const body = `Ciao ${p.cliente_nome ?? ''},\n\nIn allegato trovi il preventivo ${formattaNumeroPreventivo(
-        p.anno,
-        p.numero_preventivo
-      )}.\n\nSaluti`;
+      const subject = `Preventivo ${numero}${firmato}`;
+      const body = `Ciao ${p.cliente_nome ?? ''},\n\nIn allegato trovi il preventivo ${numero}${firmato}.\n\nSaluti`;
 
       if (await MailComposer.isAvailableAsync()) {
         await MailComposer.composeAsync({
@@ -288,7 +338,8 @@ export default function DettaglioPreventivoScreen() {
       }
     } catch (err) {
       console.error(err);
-      avviso('Errore', "Impossibile inviare l'email.");
+      if (p?.firmato_file) erroreDocumento(p);
+      else avviso('Errore', "Impossibile inviare l'email.");
     } finally {
       setGenerandoPdf(false);
     }
@@ -432,7 +483,11 @@ export default function DettaglioPreventivoScreen() {
             <Text
               style={[styles.data, { color: t.testoIntestazioneSecondario }]}
             >
-              {preventivo.sconto > 0 ? 'Totale arrotondato' : 'Totale con IVA'}
+              {etichettaTotaleFinale(
+                preventivo.aliquota_iva,
+                preventivo.sconto,
+                preventivo.marca_bollo ?? 0
+              )}
             </Text>
             <Text style={[styles.totaleGrande, { color: t.testoIntestazione }]}>
               {formattaEuro(preventivo.totale_generale)}
@@ -584,7 +639,7 @@ export default function DettaglioPreventivoScreen() {
                         { color: t.testoSecondario },
                       ]}
                     >
-                      {v.quantita.toLocaleString('it-IT')} ×{' '}
+                      {quantitaConUnita(v.quantita, v.unita)} ×{' '}
                       {formattaEuro(v.prezzo_unitario)}
                     </Text>
                   </View>
@@ -613,18 +668,31 @@ export default function DettaglioPreventivoScreen() {
                 />
                 <RigaTotale
                   t={t}
-                  etichetta={`IVA ${preventivo.aliquota_iva}%`}
-                  valore={formattaEuro(preventivo.totale_iva)}
+                  etichetta={
+                    preventivo.aliquota_iva > 0
+                      ? `IVA ${preventivo.aliquota_iva}%`
+                      : 'IVA'
+                  }
+                  valore={
+                    preventivo.aliquota_iva > 0
+                      ? formattaEuro(preventivo.totale_iva)
+                      : 'non soggetta'
+                  }
                 />
                 {preventivo.sconto > 0 && (
                   <>
-                    <RigaTotale
-                      t={t}
-                      etichetta="Totale con IVA"
-                      valore={formattaEuro(
-                        preventivo.totale_imponibile + preventivo.totale_iva
-                      )}
-                    />
+                    {/* Senza IVA sarebbe uguale all'imponibile: si salta */}
+                    {preventivo.aliquota_iva > 0 && (
+                      <RigaTotale
+                        t={t}
+                        etichetta={etichettaTotaleConIva(
+                          preventivo.aliquota_iva
+                        )}
+                        valore={formattaEuro(
+                          preventivo.totale_imponibile + preventivo.totale_iva
+                        )}
+                      />
+                    )}
                     <RigaTotale
                       t={t}
                       etichetta={`Sconto arrotondamento (${formattaPercentuale(
@@ -636,6 +704,13 @@ export default function DettaglioPreventivoScreen() {
                       valore={`− ${formattaEuro(preventivo.sconto)}`}
                     />
                   </>
+                )}
+                {(preventivo.marca_bollo ?? 0) > 0 && (
+                  <RigaTotale
+                    t={t}
+                    etichetta="Marca da bollo"
+                    valore={formattaEuro(preventivo.marca_bollo)}
+                  />
                 )}
                 <View
                   style={[
@@ -660,6 +735,13 @@ export default function DettaglioPreventivoScreen() {
               </View>
             </View>
           </Sezione>
+
+          {/* --- COPIA FIRMATA: solo per i preventivi già inviati --- */}
+          {!bozza && (
+            <Sezione t={t} titolo="Copia firmata">
+              <CopiaFirmata preventivo={preventivo} onCambiato={carica} />
+            </Sezione>
+          )}
 
           {/* --- NOTE / PAGAMENTO --- */}
           {!!preventivo.note_pagamento && (
@@ -697,6 +779,17 @@ export default function DettaglioPreventivoScreen() {
           { backgroundColor: t.barraTab, borderTopColor: t.bordo },
         ]}
       >
+        {/* Con la copia firmata, i pulsanti mandano quella */}
+        {!!preventivo.firmato_file && (
+          <View style={styles.notaFirmato}>
+            <Feather name="check-circle" size={14} color={t.successo} />
+            <Text
+              style={[styles.notaFirmatoTesto, { color: t.testoSecondario }]}
+            >
+              Invii e stampi la copia firmata dal cliente
+            </Text>
+          </View>
+        )}
         <Pressable
           onPress={condividiWhatsApp}
           disabled={generandoPdf}
@@ -731,6 +824,13 @@ export default function DettaglioPreventivoScreen() {
         <View style={styles.azioniSecondarie}>
           <AzioneSecondaria
             t={t}
+            icona="eye"
+            testo="Vedi PDF"
+            onPress={vediPdf}
+            disabilitata={generandoPdf}
+          />
+          <AzioneSecondaria
+            t={t}
             icona="mail"
             testo="Email"
             onPress={condividiEmail}
@@ -739,12 +839,17 @@ export default function DettaglioPreventivoScreen() {
           <AzioneSecondaria
             t={t}
             icona="printer"
-            testo="PDF e stampa"
+            testo="Stampa"
             onPress={salvaEStampaPdf}
             disabilitata={generandoPdf}
           />
         </View>
       </View>
+
+      <VisualizzatoreDocumento
+        documento={pdfAperto}
+        onChiudi={() => setPdfAperto(null)}
+      />
     </View>
   );
 }
@@ -870,5 +975,14 @@ function RigaTotale({
         {valore}
       </Text>
     </View>
+  );
+}
+
+// react-native-share è un modulo nativo: c'è nell'app installata, non in
+// Expo Go. TurboModuleRegistry.get (a differenza di getEnforcing, usato
+// dalla libreria) restituisce null invece di lanciare un errore.
+function shareNativoDisponibile(): boolean {
+  return (
+    TurboModuleRegistry.get('RNShare') != null || NativeModules.RNShare != null
   );
 }

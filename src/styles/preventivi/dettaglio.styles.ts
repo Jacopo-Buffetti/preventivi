@@ -159,6 +159,13 @@ export const styles = StyleSheet.create({
     gap: 10,
     borderTopWidth: 1,
   },
+  notaFirmato: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  notaFirmatoTesto: { fontSize: 12, fontFamily: FONT.semi },
   azionePrincipale: {
     height: 56,
     borderRadius: 16,
@@ -168,18 +175,21 @@ export const styles = StyleSheet.create({
     gap: 10,
   },
   azionePrincipaleTesto: { fontSize: 16, fontFamily: FONT.pieno },
-  azioniSecondarie: { flexDirection: 'row', gap: 10 },
+  // Tre pulsanti affiancati: icona e testo stanno stretti, quindi
+  // margini ridotti e testo un po' più piccolo
+  azioniSecondarie: { flexDirection: 'row', gap: 8 },
   azioneSecondaria: {
     flex: 1,
     height: 48,
     borderRadius: 14,
     borderWidth: 1.5,
+    paddingHorizontal: 6,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
   },
-  azioneSecondariaTesto: { fontSize: 14, fontFamily: FONT.grassetto },
+  azioneSecondariaTesto: { fontSize: 13, fontFamily: FONT.grassetto },
 
   disabilitato: { opacity: 0.6 },
   premuto: { opacity: 0.85, transform: [{ scale: 0.98 }] },

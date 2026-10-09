@@ -3,6 +3,8 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { Platform } from 'react-native';
 import { DOCUMENTO } from '../constants/documento';
+import { DICITURA_SENZA_IVA } from '../constants/fisco';
+import { quantitaConUnita } from '../constants/unita';
 import {
   htmlPreventivo,
   type DatiPdfPreventivo,
@@ -68,18 +70,21 @@ async function costruisciDati(
     },
 
     azienda: {
-      nome: profilo?.nome_azienda || 'La tua officina',
+      nome: profilo?.nome_azienda || 'La tua attività',
       indirizzo: profilo?.indirizzo,
       partitaIva: profilo?.p_iva,
       codiceFiscale: profilo?.codice_fiscale,
       email: profilo?.email,
       telefono: profilo?.telefono,
       iban: profilo?.iban,
+      firma: profilo?.firma || undefined,
+      timbro: profilo?.timbro || undefined,
     },
 
     righe: voci.map((v) => ({
       descrizione: v.descrizione,
-      quantita: v.quantita.toLocaleString('it-IT'),
+      // Con l'unità, se c'è: "12 m²", "3 h"
+      quantita: quantitaConUnita(v.quantita, v.unita),
       prezzoUnitario: importo(v.prezzo_unitario),
       totale: importo(v.totale_voce),
     })),
@@ -87,6 +92,12 @@ async function costruisciDati(
     imponibile: importo(preventivo.totale_imponibile),
     ivaPercentuale: preventivo.aliquota_iva,
     iva: importo(preventivo.totale_iva),
+    dicituraSenzaIva:
+      preventivo.aliquota_iva === 0 ? DICITURA_SENZA_IVA : undefined,
+    marcaBollo:
+      (preventivo.marca_bollo ?? 0) > 0
+        ? importo(preventivo.marca_bollo)
+        : undefined,
     totale: importo(preventivo.totale_generale),
     arrotondamento:
       sconto > 0

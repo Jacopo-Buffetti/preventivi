@@ -14,6 +14,8 @@ import { styles } from './FoglioArrotonda.styles';
 interface Props {
   visibile: boolean;
   totaleConIva: number;
+  // "Totale con IVA", o solo "Totale" quando l'IVA è a 0
+  etichettaTotale?: string;
   scontoAttuale: number; // 0 = nessun arrotondamento applicato
   onChiudi: () => void;
   onApplica: (sconto: number) => void;
@@ -25,6 +27,7 @@ interface Props {
 export function FoglioArrotonda({
   visibile,
   totaleConIva,
+  etichettaTotale = 'Totale con IVA',
   scontoAttuale,
   onChiudi,
   onApplica,
@@ -66,7 +69,7 @@ export function FoglioArrotonda({
           <Text
             style={[styles.riquadroEtichetta, { color: t.testoSecondario }]}
           >
-            Totale con IVA
+            {etichettaTotale}
           </Text>
           <Text style={[styles.riquadroValore, { color: t.testo }]}>
             {formattaEuro(totaleConIva)}

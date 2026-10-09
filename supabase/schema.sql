@@ -78,7 +78,11 @@ create table if not exists preventivi (
   totale_imponibile numeric(12, 2) not null default 0,
   totale_iva        numeric(12, 2) not null default 0,
   sconto            numeric(12, 2) not null default 0,  -- arrotondamento (migrazione 003)
+  marca_bollo       numeric(12, 2) not null default 0,  -- marca da bollo (migrazione 007)
   totale_generale   numeric(12, 2) not null default 0,
+  firmato_file      text,         -- copia firmata dal cliente (migrazione 004)
+  firmato_tipo      text,
+  firmato_at        timestamptz,
   voci              jsonb not null default '[]'::jsonb,
   updated_at        timestamptz not null,
   deleted_at        timestamptz,
@@ -93,7 +97,7 @@ create unique index if not exists preventivi_numero_unico
   on preventivi (user_id, anno, numero_preventivo)
   where numero_preventivo is not null;
 
--- Profilo dell'officina: una riga per utente, quindi la chiave è user_id
+-- Profilo dell'attività: una riga per utente, quindi la chiave è user_id
 create table if not exists profilo (
   user_id           uuid primary key default auth.uid()
                     references auth.users (id) on delete cascade,
@@ -105,6 +109,10 @@ create table if not exists profilo (
   email             text,
   indirizzo         text,
   iban              text,
+  firma             text,         -- immagini data URI (migrazione 005)
+  timbro            text,
+  aliquota_iva      numeric(5, 2) not null default 22,  -- migrazione 007
+  marca_bollo       boolean       not null default false,
   updated_at        timestamptz not null,
   server_updated_at timestamptz not null default now()
 );
@@ -129,6 +137,22 @@ create table if not exists biglietto (
   rea                text,
   updated_at         timestamptz not null,
   server_updated_at  timestamptz not null default now()
+);
+
+-- Voci rapide: le voci che l'utente usa più spesso (migrazione 006).
+-- Il dettaglio con trigger e regole di accesso è in 006_voci_rapide.sql.
+create table if not exists voci_rapide (
+  id                text primary key,
+  user_id           uuid not null default auth.uid()
+                    references auth.users (id) on delete cascade,
+  descrizione       text not null,
+  prezzo            numeric(12, 2) not null default 0,
+  quantita          numeric(12, 3) not null default 1,
+  unita             text,
+  posizione         integer not null default 0,
+  updated_at        timestamptz not null,
+  deleted_at        timestamptz,
+  server_updated_at timestamptz not null default now()
 );
 
 -- Indici per il pull: "dammi le righe di questo utente cambiate dopo X"

@@ -61,6 +61,14 @@ export function proposteArrotondamento(totale: number): number[] {
   return [...new Set(proposte)];
 }
 
+// Peso di un file: 317000 → "310 KB", 1250000 → "1,2 MB"
+export function formattaDimensione(byte: number): string {
+  if (byte < 1024 * 1024) return `${Math.max(1, Math.round(byte / 1024))} KB`;
+  return `${(byte / (1024 * 1024)).toLocaleString('it-IT', {
+    maximumFractionDigits: 1,
+  })} MB`;
+}
+
 // Converte un testo digitato ("1,5" o "1.5") in numero. Restituisce null se non valido.
 export function leggiNumero(testo: string): number | null {
   const pulito = testo.trim().replace(',', '.');

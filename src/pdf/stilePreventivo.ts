@@ -214,11 +214,13 @@ export const CSS = `
     }
 
     .col-description {
-      width: 57%;
+      width: 54%;
     }
 
+    /* Un po' più larga per l'unità ("12,5 m²"), che non va a capo */
     .col-qty {
-      width: 10%;
+      width: 13%;
+      white-space: nowrap;
     }
 
     .col-price {
@@ -241,6 +243,18 @@ export const CSS = `
       font-size: 8.5px;
       line-height: 1.55;
       margin: 0 0 6px;
+    }
+
+    /* Dicitura del regime forfettario: testo di legge, ben leggibile */
+    .notes .tax-note {
+      color: var(--navy);
+      font-size: 8.5px;
+      font-weight: 600;
+      line-height: 1.5;
+      margin-top: 2mm;
+      padding-left: 3mm;
+      border-left: 2px solid var(--gold);
+      max-width: 85mm;
     }
 
     .summary {
@@ -329,7 +343,43 @@ export const CSS = `
       color: var(--navy);
       font-size: 9px;
       font-weight: 800;
-      margin-bottom: 16mm;
+    }
+
+    /* Spazio sopra la linea: vuoto per il cliente, con timbro e firma per
+       il professionista. Le immagini sono posizionate sopra la linea e la
+       superano un poco, come una firma vera; non spostano niente. */
+    .signature-space {
+      position: relative;
+      height: 18mm;
+      margin-top: 2mm;
+    }
+
+    /* "multiply": il bianco delle immagini diventa trasparente, così una
+       foto su foglio bianco si appoggia sul timbro senza coprirlo */
+    .signature-stamp,
+    .signature-sign {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      object-fit: contain;
+      mix-blend-mode: multiply;
+    }
+
+    /* Il timbro sotto... */
+    .signature-stamp {
+      bottom: -3mm;
+      height: 20mm;
+      max-width: 42mm;
+      opacity: 0.9;
+      z-index: 1;
+    }
+
+    /* ...e la firma sopra */
+    .signature-sign {
+      bottom: -4mm;
+      height: 15mm;
+      max-width: 62mm;
+      z-index: 2;
     }
 
     .signature-line {

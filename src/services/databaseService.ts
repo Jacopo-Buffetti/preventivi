@@ -1,4 +1,5 @@
 import { adesso, getDbConnection } from './db';
+import { ALIQUOTA_IVA_PREDEFINITA } from '../constants/fisco';
 import { segnalaModificaLocale } from './eventiSync';
 import { nuovoId } from './id';
 
@@ -13,6 +14,19 @@ export interface ProfiloFabbro {
   email?: string;
   indirizzo?: string;
   iban?: string;
+  // Immagini come data URI (data:image/png;base64,...): finiscono nel PDF
+  // nello spazio "Firma per conferma", la firma sopra il timbro
+  firma?: string | null;
+  timbro?: string | null;
+  // Impostazioni dei preventivi nuovi (vedi constants/fisco.ts).
+  // Non le tocca updateProfiloFabbro: si salvano da sole, dal Profilo.
+  aliquota_iva?: number;
+  marca_bollo?: number; // 1 = sì, 0 = no
+}
+
+export interface ImpostazioniPreventivi {
+  aliquota_iva: number;
+  marca_bollo: boolean;
 }
 
 export interface Cliente {
@@ -27,6 +41,7 @@ export interface Cliente {
 export interface VocePreventivoInput {
   descrizione: string;
   quantita: number;
+  unita?: string | null; // id da constants/unita.ts, null = nessuna
   prezzo_unitario: number;
 }
 
@@ -39,6 +54,8 @@ export interface PreventivoInput {
   note_pagamento?: string;
   // Sconto di arrotondamento in euro, tolto dal totale con IVA (0 = nessuno)
   sconto?: number;
+  // Marca da bollo in euro, aggiunta al totale (0 = nessuna)
+  marca_bollo?: number;
   stato?: StatoPreventivo;
   voci: VocePreventivoInput[];
 }
@@ -58,7 +75,14 @@ export interface Preventivo {
   totale_imponibile: number;
   totale_iva: number;
   sconto: number; // arrotondamento in euro, già tolto da totale_generale
-  totale_generale: number; // totale da pagare: imponibile + IVA - sconto
+  marca_bollo: number; // marca da bollo in euro, già compresa nel totale
+  // totale da pagare: imponibile + IVA - sconto + marca da bollo
+  totale_generale: number;
+  // Copia firmata dal cliente (vedi firmatiService.ts)
+  firmato_file: string | null;
+  firmato_tipo: string | null;
+  firmato_at: string | null;
+  firmato_da_caricare?: number;
 }
 
 export interface VocePreventivo {
@@ -66,6 +90,7 @@ export interface VocePreventivo {
   preventivo_id: string;
   descrizione: string;
   quantita: number;
+  unita: string | null;
   prezzo_unitario: number;
   totale_voce: number;
 }
@@ -96,6 +121,7 @@ export async function updateProfiloFabbro(
       `UPDATE profilo_fabbro SET 
         nome_azienda = ?, titolare = ?, p_iva = ?, codice_fiscale = ?, 
         telefono = ?, email = ?, indirizzo = ?, iban = ?,
+        firma = ?, timbro = ?,
         updated_at = ?, da_sincronizzare = 1
        WHERE id = ?;`,
       [
@@ -107,6 +133,8 @@ export async function updateProfiloFabbro(
         profilo.email || '',
         profilo.indirizzo || '',
         profilo.iban || '',
+        profilo.firma ?? null,
+        profilo.timbro ?? null,
         adesso(),
         esistente.id!,
       ]
@@ -115,8 +143,8 @@ export async function updateProfiloFabbro(
     await db.runAsync(
       `INSERT INTO profilo_fabbro 
         (nome_azienda, titolare, p_iva, codice_fiscale, telefono, email, indirizzo, iban,
-         updated_at, da_sincronizzare)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1);`,
+         firma, timbro, updated_at, da_sincronizzare)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1);`,
       [
         profilo.nome_azienda,
         profilo.titolare || '',
@@ -126,6 +154,8 @@ export async function updateProfiloFabbro(
         profilo.email || '',
         profilo.indirizzo || '',
         profilo.iban || '',
+        profilo.firma ?? null,
+        profilo.timbro ?? null,
         adesso(),
       ]
     );
@@ -224,6 +254,53 @@ export async function deleteCliente(id: string): Promise<void> {
 
 // --- PREVENTIVI ---
 
+// Marca da bollo: mai negativa, arrotondata al centesimo
+export function bolloValido(bollo: number | undefined): number {
+  if (!bollo || !Number.isFinite(bollo) || bollo <= 0) return 0;
+  return Math.round(bollo * 100) / 100;
+}
+
+// --- IMPOSTAZIONI DEI PREVENTIVI (aliquota IVA e marca da bollo) ---
+
+export async function getImpostazioniPreventivi(): Promise<ImpostazioniPreventivi> {
+  const profilo = await getProfiloFabbro();
+  return {
+    aliquota_iva: profilo?.aliquota_iva ?? ALIQUOTA_IVA_PREDEFINITA,
+    marca_bollo: profilo?.marca_bollo === 1,
+  };
+}
+
+// Salva subito, senza passare dal pulsante "Salva i dati" del profilo.
+// Se il profilo non c'è ancora, lo crea vuoto (il nome dell'attività si
+// completa poi nel form).
+export async function aggiornaImpostazioniPreventivi(
+  impostazioni: ImpostazioniPreventivi
+): Promise<void> {
+  const db = await getDbConnection();
+  const esistente = await getProfiloFabbro();
+  const valori = [
+    impostazioni.aliquota_iva,
+    impostazioni.marca_bollo ? 1 : 0,
+    adesso(),
+  ];
+  if (esistente) {
+    await db.runAsync(
+      `UPDATE profilo_fabbro
+       SET aliquota_iva = ?, marca_bollo = ?, updated_at = ?, da_sincronizzare = 1
+       WHERE id = ?;`,
+      [...valori, esistente.id!]
+    );
+  } else {
+    await db.runAsync(
+      `INSERT INTO profilo_fabbro
+         (nome_azienda, aliquota_iva, marca_bollo, updated_at, da_sincronizzare)
+       VALUES ('', ?, ?, ?, 1);`,
+      valori
+    );
+  }
+  segnalaModificaLocale();
+}
+
 // Lo sconto di arrotondamento: arrotondato al centesimo, mai negativo e mai
 // più grande del totale con IVA. Un valore assurdo diventa 0.
 export function scontoValido(
@@ -259,16 +336,19 @@ export async function savePreventivoWithVoci(
 
   const totaleIva = (imponibile * aliquotaIva) / 100;
   const sconto = scontoValido(input.sconto, imponibile + totaleIva);
-  const totaleGenerale = imponibile + totaleIva - sconto;
+  const bollo = bolloValido(input.marca_bollo);
+  // Il bollo si aggiunge DOPO l'arrotondamento: è una spesa a parte,
+  // non fa parte del prezzo del lavoro
+  const totaleGenerale = imponibile + totaleIva - sconto + bollo;
 
   // Esecuzione in TRANSAZIONE Atomica
   await db.withTransactionAsync(async () => {
     // Inserimento Testata
     await db.runAsync(
       `INSERT INTO preventivi 
-        (id, cliente_id, numero_preventivo, anno, data_creazione, oggetto, stato, aliquota_iva, note_pagamento, totale_imponibile, totale_iva, sconto, totale_generale,
+        (id, cliente_id, numero_preventivo, anno, data_creazione, oggetto, stato, aliquota_iva, note_pagamento, totale_imponibile, totale_iva, sconto, marca_bollo, totale_generale,
          updated_at, da_sincronizzare)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1);`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1);`,
       [
         preventivoId,
         input.cliente_id,
@@ -282,6 +362,7 @@ export async function savePreventivoWithVoci(
         imponibile,
         totaleIva,
         sconto,
+        bollo,
         totaleGenerale,
         dataCreazione,
       ]
@@ -291,13 +372,14 @@ export async function savePreventivoWithVoci(
     for (const voce of vociCalcolate) {
       const voceId = nuovoId();
       await db.runAsync(
-        `INSERT INTO voci_preventivo (id, preventivo_id, descrizione, quantita, prezzo_unitario, totale_voce)
-         VALUES (?, ?, ?, ?, ?, ?);`,
+        `INSERT INTO voci_preventivo (id, preventivo_id, descrizione, quantita, unita, prezzo_unitario, totale_voce)
+         VALUES (?, ?, ?, ?, ?, ?, ?);`,
         [
           voceId,
           preventivoId,
           voce.descrizione,
           voce.quantita,
+          voce.unita ?? null,
           voce.prezzo_unitario,
           voce.totaleVoce,
         ]
@@ -377,12 +459,19 @@ export async function updateStatoPreventivo(
 // Cancellazione "soft" del preventivo.
 // Le voci restano nel database ma non si vedono più: si leggono sempre
 // passando dal preventivo, che ora risulta cancellato.
+// L'eventuale copia firmata invece si stacca: alla sincronizzazione il
+// file viene tolto dal server e dal telefono (inviaFileFirmati).
+// In SQLite le espressioni di un UPDATE leggono i valori PRIMA della
+// modifica: il CASE vede ancora il firmato_file originale.
 export async function deletePreventivo(id: string): Promise<void> {
   const db = await getDbConnection();
   const ora = adesso();
   await db.runAsync(
     `UPDATE preventivi
-     SET deleted_at = ?, updated_at = ?, da_sincronizzare = 1
+     SET deleted_at = ?, updated_at = ?, da_sincronizzare = 1,
+         firmato_da_caricare = CASE WHEN firmato_file IS NOT NULL
+                                    THEN 1 ELSE firmato_da_caricare END,
+         firmato_file = NULL, firmato_tipo = NULL, firmato_at = NULL
      WHERE id = ?;`,
     [ora, ora, id]
   );

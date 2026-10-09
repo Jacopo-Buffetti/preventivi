@@ -36,6 +36,19 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   testi: { flex: 1, minWidth: 0, gap: 2 },
+  conteggio: {
+    minWidth: 26,
+    height: 22,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  conteggioTesto: {
+    fontSize: 12,
+    fontFamily: FONT.grassetto,
+    fontVariant: ['tabular-nums'],
+  },
   etichetta: { fontSize: 13, fontFamily: FONT.regolare },
   valore: { fontSize: 15, fontFamily: FONT.grassetto },
 

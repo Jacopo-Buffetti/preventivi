@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "preventivi",
+    "name": "Previo",
     "slug": "preventivi",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -18,7 +18,7 @@
     "android": {
       "package": "com.jacopobuffetti.preventivi",
       "adaptiveIcon": {
-        "backgroundColor": "#000000",
+        "backgroundColor": "#02102B",
         "foregroundImage": "./assets/images/android-icon-foreground.png"
       },
       "predictiveBackGestureEnabled": false
@@ -31,13 +31,21 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#000000",
+          "backgroundColor": "#02102B",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200
+          "imageWidth": 240
         }
       ],
       "expo-sqlite",
-      "expo-mail-composer"
+      "expo-mail-composer",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Serve per scegliere la foto del preventivo firmato, della firma, del timbro o del logo del biglietto da visita.",
+          "cameraPermission": "Serve per fotografare il preventivo firmato dal cliente.",
+          "microphonePermission": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

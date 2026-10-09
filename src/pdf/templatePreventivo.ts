@@ -33,12 +33,19 @@ export interface DatiPdfPreventivo {
     email?: string;
     telefono?: string;
     iban?: string;
+    // Immagini (data URI) per lo spazio "Firma per Conferma"
+    firma?: string;
+    timbro?: string;
   };
 
   righe: RigaPdf[];
   imponibile: string;
-  ivaPercentuale: number;
+  ivaPercentuale: number; // 0 = senza IVA: niente riga IVA, c'è la dicitura
   iva: string;
+  // Testo obbligatorio quando l'IVA è a 0 (regime forfettario)
+  dicituraSenzaIva?: string;
+  // Importo della marca da bollo, solo se c'è
+  marcaBollo?: string;
   totale: string; // totale da pagare (già arrotondato, se c'è lo sconto)
   // Solo se il totale è stato arrotondato
   arrotondamento?: {
@@ -95,7 +102,7 @@ export function htmlPreventivo(d: DatiPdfPreventivo): string {
               <strong>${esc(r.descrizione)}</strong>
               ${r.dettagli ? `<small>${esc(r.dettagli)}</small>` : ''}
             </td>
-            <td>${esc(r.quantita)}</td>
+            <td class="col-qty">${esc(r.quantita)}</td>
             <td>€ ${esc(r.prezzoUnitario)}</td>
             <td>€ ${esc(r.totale)}</td>
           </tr>`
@@ -184,6 +191,7 @@ export function htmlPreventivo(d: DatiPdfPreventivo): string {
     <section class="bottom">
       <div class="notes">
         ${d.note ? `<div class="section-label">NOTE E CONDIZIONI</div><p>${esc(d.note)}</p>` : ''}
+        ${d.dicituraSenzaIva ? `<p class="tax-note">${esc(d.dicituraSenzaIva)}</p>` : ''}
       </div>
 
       <div class="summary">
@@ -191,19 +199,37 @@ export function htmlPreventivo(d: DatiPdfPreventivo): string {
           <span>Imponibile</span>
           <strong>€ ${esc(d.imponibile)}</strong>
         </div>
-        <div class="summary-row">
+        ${
+          d.ivaPercentuale > 0
+            ? `<div class="summary-row">
           <span>IVA ${d.ivaPercentuale}%</span>
           <strong>€ ${esc(d.iva)}</strong>
-        </div>
+        </div>`
+            : ''
+        }
         ${
           d.arrotondamento
-            ? `<div class="summary-row">
+            ? `${
+                // Senza IVA il totale prima dello sconto è uguale
+                // all'imponibile: la riga sarebbe un doppione
+                d.ivaPercentuale > 0
+                  ? `<div class="summary-row">
           <span>Totale con IVA</span>
           <strong>€ ${esc(d.arrotondamento.totaleConIva)}</strong>
-        </div>
+        </div>`
+                  : ''
+              }
         <div class="summary-row">
           <span>Sconto ${esc(d.arrotondamento.percentuale)}</span>
           <strong>− € ${esc(d.arrotondamento.sconto)}</strong>
+        </div>`
+            : ''
+        }
+        ${
+          d.marcaBollo
+            ? `<div class="summary-row">
+          <span>Marca da bollo</span>
+          <strong>€ ${esc(d.marcaBollo)}</strong>
         </div>`
             : ''
         }
@@ -232,12 +258,17 @@ export function htmlPreventivo(d: DatiPdfPreventivo): string {
     <section class="signatures">
       <div class="signature-box">
         <div class="signature-title">Firma per Conferma</div>
+        <div class="signature-space">
+          ${a.timbro ? `<img class="signature-stamp" src="${esc(a.timbro)}" alt="">` : ''}
+          ${a.firma ? `<img class="signature-sign" src="${esc(a.firma)}" alt="">` : ''}
+        </div>
         <div class="signature-line"></div>
         <div class="signature-caption">Firma e timbro del professionista</div>
       </div>
 
       <div class="signature-box">
         <div class="signature-title">Firma per Accettazione Cliente</div>
+        <div class="signature-space"></div>
         <div class="signature-line"></div>
         <div class="signature-caption">Firma del cliente per accettazione del preventivo</div>
       </div>

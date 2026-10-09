@@ -8,15 +8,24 @@ export const styles = StyleSheet.create({
     marginTop: 14,
     marginBottom: 6,
   },
-  chips: { gap: 8, paddingVertical: 2 },
-  chip: {
-    height: 36,
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    justifyContent: 'center',
+  // Etichetta "Le tue voci rapide" con il link Gestisci a destra
+  rigaEtichetta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
   },
-  chipTesto: { fontSize: 13 },
+  gestisci: { fontSize: 13, fontFamily: FONT.grassetto },
+  chips: { gap: 8, paddingVertical: 2 },
+  nessunaRapida: { fontSize: 13, lineHeight: 18, fontFamily: FONT.regolare },
+  rigaInterruttore: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 16,
+  },
+  testiInterruttore: { flex: 1, gap: 2 },
+  titoloInterruttore: { fontSize: 15, fontFamily: FONT.grassetto },
+  sottoInterruttore: { fontSize: 13, fontFamily: FONT.regolare },
   input: {
     borderWidth: 1,
     borderRadius: 14,

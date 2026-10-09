@@ -1,19 +1,25 @@
 import { Feather } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ImpostazioniPreventivi } from '../../components/profilo/ImpostazioniPreventivi';
 import { ProfiloForm } from '../../components/profilo/ProfiloForm';
 import { useSceltaTema, useTema, type Tema } from '../../constants/tema';
+import { useCaricaQuandoVisibile } from '../../hooks/useCaricaQuandoVisibile';
 import { supabase } from '../../services/supabase';
 import { sincronizzaOra, useStatoSync } from '../../services/syncAutomatico';
-import { avviso, conferma } from '../../utils/dialoghi';
+import { getVociRapide } from '../../services/vociRapideService';
 import { styles } from '../../styles/profilo.styles';
+import { avviso, conferma } from '../../utils/dialoghi';
 
 export default function ProfiloScreen() {
   const t = useTema();
   const { nome: nomeTema, alterna } = useSceltaTema();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const [emailUtente, setEmailUtente] = useState<string | null>(null);
+  const [numeroVociRapide, setNumeroVociRapide] = useState<number | null>(null);
   const statoSync = useStatoSync();
 
   // Email dell'utente collegato, letta dalla sessione salvata
@@ -23,6 +29,13 @@ export default function ProfiloScreen() {
       .then(({ data }) => setEmailUtente(data.session?.user.email ?? null))
       .catch(console.error);
   }, []);
+
+  // Quante voci rapide ci sono: si rilegge tornando dalla loro pagina
+  useCaricaQuandoVisibile(() => {
+    getVociRapide()
+      .then((voci) => setNumeroVociRapide(voci.length))
+      .catch(console.error);
+  });
 
   // Stato della sincronizzazione: testo e colore del pallino
   const orario = statoSync.ultimaRiuscita?.toLocaleTimeString('it-IT', {
@@ -79,7 +92,7 @@ export default function ProfiloScreen() {
           Profilo
         </Text>
         <Text style={[styles.sottotitolo, { color: t.testoSecondario }]}>
-          Account, aspetto dell'app e dati dell'officina.
+          Account, aspetto dell'app e dati dell'attività.
         </Text>
       </View>
 
@@ -190,10 +203,54 @@ export default function ProfiloScreen() {
         </View>
       </Sezione>
 
-      {/* --- DATI DELL'OFFICINA --- */}
+      {/* --- PREVENTIVI: come si compilano --- */}
       <Sezione
         t={t}
-        titolo="Dati dell'officina"
+        titolo="Preventivi"
+        sottotitolo="Come si compilano i tuoi preventivi."
+      >
+        <Pressable
+          onPress={() => router.push('/profilo/voci-rapide')}
+          accessibilityRole="button"
+          accessibilityLabel={`Voci rapide${
+            numeroVociRapide ? `, ${numeroVociRapide}` : ''
+          }`}
+          style={({ pressed }) => [
+            styles.card,
+            styles.rigaTema,
+            { backgroundColor: t.card, borderColor: t.bordo },
+            pressed && styles.premuto,
+          ]}
+        >
+          <View style={[styles.iconaRiquadro, { backgroundColor: t.riquadro }]}>
+            <Feather name="list" size={20} color={t.testo} />
+          </View>
+          <View style={styles.testi}>
+            <Text style={[styles.valore, { color: t.testo }]}>Voci rapide</Text>
+            <Text style={[styles.etichetta, { color: t.testoSecondario }]}>
+              Pronte da aggiungere ai preventivi con un tocco.
+            </Text>
+          </View>
+          {!!numeroVociRapide && (
+            <View
+              style={[styles.conteggio, { backgroundColor: t.bottonePrimario }]}
+            >
+              <Text
+                style={[styles.conteggioTesto, { color: t.testoSuPrimario }]}
+              >
+                {numeroVociRapide}
+              </Text>
+            </View>
+          )}
+          <Feather name="chevron-right" size={20} color={t.testoSecondario} />
+        </Pressable>
+        <ImpostazioniPreventivi />
+      </Sezione>
+
+      {/* --- DATI DELL'ATTIVITÀ --- */}
+      <Sezione
+        t={t}
+        titolo="Dati dell'attività"
         sottotitolo="Compaiono sui preventivi e completano il biglietto da visita."
       >
         <ProfiloForm />

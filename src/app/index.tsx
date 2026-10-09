@@ -33,12 +33,12 @@ import {
   useTiraPerAggiornare,
   type StatoSync,
 } from '../services/syncAutomatico';
+import { styles } from '../styles/home.styles';
 import {
   formattaEuro,
   formattaNumeroPreventivo,
   numeroWhatsApp,
 } from '../utils/formato';
-import { styles } from '../styles/home.styles';
 
 // =====================================================================
 // HOME
@@ -148,7 +148,7 @@ export default function HomeScreen() {
                 style={[styles.nomeAttivita, { color: t.testoIntestazione }]}
                 numberOfLines={1}
               >
-                {nomeAttivita ?? 'La tua officina'}
+                {nomeAttivita ?? 'La tua attività'}
               </Text>
               <StatoSincronizzazione t={t} stato={statoSync} />
             </View>
@@ -219,7 +219,7 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.corpo}>
-          {/* Profilo non compilato: i PDF uscirebbero con "La tua officina" */}
+          {/* Profilo non compilato: i PDF uscirebbero con "La tua attività" */}
           {caricato && !nomeAttivita && (
             <Pressable
               onPress={() => router.push('/profilo')}
@@ -232,7 +232,7 @@ export default function HomeScreen() {
             >
               <Feather name="alert-circle" size={20} color={t.accento} />
               <Text style={[styles.avvisoTesto, { color: t.testo }]}>
-                Completa il profilo: nome e dati dell'officina compaiono sui
+                Completa il profilo: nome e dati dell'attività compaiono sui
                 preventivi.
               </Text>
               <Feather

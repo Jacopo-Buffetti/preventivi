@@ -6,11 +6,13 @@ import {
   getProfiloFabbro,
   updateProfiloFabbro,
 } from '../../services/databaseService';
+import type { ImmagineProfilo } from '../../services/immaginiProfilo';
 import { avviso } from '../../utils/dialoghi';
 import { FormInput } from '../ui/FormInput';
+import { FirmaTimbro } from './FirmaTimbro';
 import { styles } from './ProfiloForm.styles';
 
-// Dati dell'officina: compaiono sui preventivi (PDF) e servono a
+// Dati dell'attività: compaiono sui preventivi (PDF) e servono a
 // completare il biglietto da visita.
 // Il componente non ha uno scorrimento proprio: sta dentro quello della
 // schermata Profilo, insieme alle schede account e aspetto.
@@ -25,6 +27,8 @@ export function ProfiloForm() {
   const [email, setEmail] = useState('');
   const [indirizzo, setIndirizzo] = useState('');
   const [iban, setIban] = useState('');
+  const [firma, setFirma] = useState<string | null>(null);
+  const [timbro, setTimbro] = useState<string | null>(null);
   const [caricamento, setCaricamento] = useState(true);
   const [salvando, setSalvando] = useState(false);
   // Diventa vero alla prima modifica, torna falso dopo il salvataggio
@@ -42,6 +46,8 @@ export function ProfiloForm() {
         setEmail(dati.email || '');
         setIndirizzo(dati.indirizzo || '');
         setIban(dati.iban || '');
+        setFirma(dati.firma || null);
+        setTimbro(dati.timbro || null);
       })
       .catch((err) => {
         console.error(err);
@@ -53,6 +59,12 @@ export function ProfiloForm() {
   // Ogni campo, quando cambia, segna anche che c'è qualcosa da salvare
   const campo = (imposta: (v: string) => void) => (valore: string) => {
     imposta(valore);
+    setModificato(true);
+  };
+
+  const cambiaImmagine = (tipo: ImmagineProfilo, valore: string | null) => {
+    if (tipo === 'firma') setFirma(valore);
+    else setTimbro(valore);
     setModificato(true);
   };
 
@@ -75,6 +87,8 @@ export function ProfiloForm() {
         email: email.trim(),
         indirizzo: indirizzo.trim(),
         iban: iban.replace(/\s/g, '').toUpperCase(),
+        firma,
+        timbro,
       });
       setModificato(false);
     } catch (err) {
@@ -97,7 +111,7 @@ export function ProfiloForm() {
     <View>
       <FormInput
         label="Nome dell'attività *"
-        placeholder="es. Officina Rossi"
+        placeholder="es. Attività Rossi"
         value={nomeAzienda}
         onChangeText={campo(setNomeAzienda)}
         aiuto="Compare in testa a ogni preventivo."
@@ -111,7 +125,7 @@ export function ProfiloForm() {
         aiuto="Il nome serve anche per il saluto nella Home."
       />
       <FormInput
-        label="Indirizzo dell'officina"
+        label="Indirizzo dell'attività"
         placeholder="es. Via Roma 1, 00100 Città"
         value={indirizzo}
         onChangeText={campo(setIndirizzo)}
@@ -162,6 +176,8 @@ export function ProfiloForm() {
         onChangeText={campo(setIban)}
         aiuto="Per i pagamenti con bonifico. Gli spazi vengono tolti al salvataggio."
       />
+
+      <FirmaTimbro firma={firma} timbro={timbro} onCambia={cambiaImmagine} />
 
       {/* Ottone con modifiche da salvare, grigio quando è tutto salvato */}
       <Pressable

@@ -158,6 +158,9 @@ function LayoutApp() {
         <Tabs.Screen
           name="preventivi"
           options={{
+            // Uscendo dalla scheda, la pila torna alla lista: rientrando si vede
+            // sempre l'elenco, non l'ultimo preventivo aperto
+            popToTopOnBlur: true,
             title: 'Preventivi',
             tabBarIcon: ({ focused, color }) => (
               <IconaTab
@@ -172,6 +175,8 @@ function LayoutApp() {
         <Tabs.Screen
           name="clienti"
           options={{
+            // Come per i preventivi: rientrando si vede sempre l'elenco
+            popToTopOnBlur: true,
             title: 'Clienti',
             tabBarIcon: ({ focused, color }) => (
               <IconaTab
@@ -198,8 +203,11 @@ function LayoutApp() {
           }}
         />
         <Tabs.Screen
-          name="profilo/index"
+          name="profilo"
           options={{
+            // Come Preventivi e Clienti: rientrando si vede il profilo,
+            // non l'ultima pagina aperta da lì (es. le voci rapide)
+            popToTopOnBlur: true,
             title: 'Profilo',
             tabBarIcon: ({ focused, color }) => (
               <IconaTab

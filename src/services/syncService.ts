@@ -1,6 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { adesso, getDbConnection } from './db';
 import { segnalaDatiAggiornati } from './eventiSync';
+import { inviaFileFirmati, svuotaFirmatiLocali } from './firmatiService';
 import { supabase } from './supabase';
 
 // =====================================================================
@@ -25,6 +26,7 @@ export interface RiepilogoPush {
   preventivi: number;
   profilo: boolean;
   biglietto: boolean;
+  vociRapide: number;
 }
 
 export interface RiepilogoPull {
@@ -32,6 +34,7 @@ export interface RiepilogoPull {
   preventivi: number;
   profilo: boolean;
   biglietto: boolean;
+  vociRapide: number;
 }
 
 export interface RiepilogoSync {
@@ -67,7 +70,8 @@ async function eseguiSincronizzazione(): Promise<RiepilogoSync> {
     ricevuti.clienti > 0 ||
     ricevuti.preventivi > 0 ||
     ricevuti.profilo ||
-    ricevuti.biglietto;
+    ricevuti.biglietto ||
+    ricevuti.vociRapide > 0;
   if (qualcosaDiNuovo) segnalaDatiAggiornati();
 
   return { inviati, ricevuti };
@@ -162,9 +166,14 @@ async function verificaUtente(
         DELETE FROM clienti;
         DELETE FROM profilo_fabbro;
         DELETE FROM biglietto;
+        DELETE FROM voci_rapide;
         DELETE FROM sync_stato;
       `);
     });
+    // Anche le copie firmate dell'utente precedente
+    await svuotaFirmatiLocali().catch((err) =>
+      console.warn('Copie firmate locali non svuotate:', err)
+    );
     segnalaDatiAggiornati();
   }
 
@@ -183,11 +192,16 @@ async function inviaModifiche(
   userId: string
 ): Promise<RiepilogoPush> {
   const clienti = await inviaClienti(db);
+  // Prima i file delle copie firmate, poi le righe dei preventivi che li
+  // nominano: così un altro dispositivo non trova mai un nome di file
+  // che sul server non c'è ancora
+  await inviaFileFirmati(db, userId);
   const preventivi = await inviaPreventivi(db);
   const profilo = await inviaProfilo(db, userId);
   const biglietto = await inviaBiglietto(db, userId);
+  const vociRapide = await inviaVociRapide(db);
 
-  return { clienti, preventivi, profilo, biglietto };
+  return { clienti, preventivi, profilo, biglietto, vociRapide };
 }
 
 // --- CLIENTI ---------------------------------------------------------
@@ -251,7 +265,11 @@ interface RigaPreventivo {
   totale_imponibile: number;
   totale_iva: number;
   sconto: number;
+  marca_bollo: number;
   totale_generale: number;
+  firmato_file: string | null;
+  firmato_tipo: string | null;
+  firmato_at: string | null;
   updated_at: string | null;
   deleted_at: string | null;
 }
@@ -260,6 +278,7 @@ interface RigaVoce {
   id: string;
   descrizione: string;
   quantita: number;
+  unita?: string | null; // assente nelle voci create prima delle unità
   prezzo_unitario: number;
   totale_voce: number;
 }
@@ -275,7 +294,7 @@ async function inviaPreventivi(db: SQLiteDatabase): Promise<number> {
     // Le voci partono sempre tutte insieme al loro preventivo, come array
     // JSON nella colonna "voci". ORDER BY rowid = nell'ordine di inserimento.
     const voci = await db.getAllAsync<RigaVoce>(
-      `SELECT id, descrizione, quantita, prezzo_unitario, totale_voce
+      `SELECT id, descrizione, quantita, unita, prezzo_unitario, totale_voce
        FROM voci_preventivo
        WHERE preventivo_id = ?
        ORDER BY rowid;`,
@@ -295,7 +314,11 @@ async function inviaPreventivi(db: SQLiteDatabase): Promise<number> {
       totale_imponibile: p.totale_imponibile,
       totale_iva: p.totale_iva,
       sconto: p.sconto ?? 0,
+      marca_bollo: p.marca_bollo ?? 0,
       totale_generale: p.totale_generale,
+      firmato_file: p.firmato_file,
+      firmato_tipo: p.firmato_tipo,
+      firmato_at: p.firmato_at,
       voci,
       updated_at: p.updated_at ?? adesso(),
       deleted_at: p.deleted_at,
@@ -307,10 +330,66 @@ async function inviaPreventivi(db: SQLiteDatabase): Promise<number> {
     const { error } = await supabase
       .from('preventivi')
       .upsert(blocco, { onConflict: 'id' });
-    if (error) throw error;
+    if (error) {
+      if (colonnaMancante(error)) {
+        avvisaMigrazioneMancante('Preventivi', error);
+        return 0;
+      }
+      throw error;
+    }
   }
 
   await segnaInviate(db, 'preventivi', righe);
+  return righe.length;
+}
+
+// --- VOCI RAPIDE -----------------------------------------------------
+
+interface RigaVoceRapida {
+  id: string;
+  descrizione: string;
+  prezzo: number;
+  quantita: number;
+  unita: string | null;
+  posizione: number;
+  updated_at: string | null;
+  deleted_at: string | null;
+}
+
+async function inviaVociRapide(db: SQLiteDatabase): Promise<number> {
+  const righe = await db.getAllAsync<RigaVoceRapida>(
+    'SELECT * FROM voci_rapide WHERE da_sincronizzare = 1;'
+  );
+  if (righe.length === 0) return 0;
+
+  const daInviare = righe.map((r) => ({
+    id: r.id,
+    descrizione: r.descrizione,
+    prezzo: r.prezzo,
+    quantita: r.quantita,
+    unita: r.unita,
+    posizione: r.posizione,
+    updated_at: r.updated_at ?? adesso(),
+    deleted_at: r.deleted_at,
+  }));
+
+  for (const blocco of aBlocchi(daInviare, 100)) {
+    const { error } = await supabase
+      .from('voci_rapide')
+      .upsert(blocco, { onConflict: 'id' });
+    if (error) {
+      // Tabella non ancora creata sul server (migrazione 006 da fare):
+      // le voci restano da inviare e partiranno appena c'è. Intanto il
+      // resto della sincronizzazione va avanti.
+      if (tabellaMancante(error)) {
+        console.warn('Voci rapide non sincronizzate: manca la migrazione 006');
+        return 0;
+      }
+      throw error;
+    }
+  }
+
+  await segnaInviate(db, 'voci_rapide', righe);
   return righe.length;
 }
 
@@ -326,6 +405,10 @@ interface RigaProfilo {
   email: string | null;
   indirizzo: string | null;
   iban: string | null;
+  firma: string | null;
+  timbro: string | null;
+  aliquota_iva: number;
+  marca_bollo: number; // 1 = sì
   updated_at: string | null;
 }
 
@@ -351,11 +434,21 @@ async function inviaProfilo(
       email: riga.email,
       indirizzo: riga.indirizzo,
       iban: riga.iban,
+      firma: riga.firma,
+      timbro: riga.timbro,
+      aliquota_iva: riga.aliquota_iva,
+      marca_bollo: riga.marca_bollo === 1,
       updated_at: riga.updated_at ?? adesso(),
     },
     { onConflict: 'user_id' }
   );
-  if (error) throw error;
+  if (error) {
+    if (colonnaMancante(error)) {
+      avvisaMigrazioneMancante('Profilo', error);
+      return false;
+    }
+    throw error;
+  }
 
   await segnaInviate(db, 'profilo_fabbro', [riga]);
   return true;
@@ -441,15 +534,16 @@ async function riceviModifiche(db: SQLiteDatabase): Promise<RiepilogoPull> {
   const profilo = (await scaricaTabella(db, 'profilo', applicaProfilo)) > 0;
   const biglietto =
     (await scaricaTabella(db, 'biglietto', applicaBiglietto)) > 0;
+  const vociRapide = await riceviVociRapide(db);
 
-  return { clienti, preventivi, profilo, biglietto };
+  return { clienti, preventivi, profilo, biglietto, vociRapide };
 }
 
 // Scarica a pagine tutte le righe cambiate di una tabella e le applica.
 // Restituisce quante righe sono state effettivamente scritte in locale.
 async function scaricaTabella<T extends { server_updated_at: string }>(
   db: SQLiteDatabase,
-  tabella: 'clienti' | 'preventivi' | 'profilo' | 'biglietto',
+  tabella: 'clienti' | 'preventivi' | 'profilo' | 'biglietto' | 'voci_rapide',
   applica: (db: SQLiteDatabase, riga: T) => Promise<boolean>
 ): Promise<number> {
   const chiave = `pull:${tabella}`;
@@ -611,7 +705,12 @@ interface PreventivoServer {
   totale_imponibile: number;
   totale_iva: number;
   sconto: number | null; // null se arriva da prima della migrazione 003
+  marca_bollo?: number | null; // assente prima della migrazione 007
   totale_generale: number;
+  // undefined se arriva da prima della migrazione 004
+  firmato_file?: string | null;
+  firmato_tipo?: string | null;
+  firmato_at?: string | null;
   voci: RigaVoce[] | null;
   updated_at: string;
   deleted_at: string | null;
@@ -635,9 +734,10 @@ async function applicaPreventivo(
     await db.runAsync(
       `INSERT INTO preventivi
          (id, cliente_id, numero_preventivo, anno, data_creazione, oggetto, stato,
-          aliquota_iva, note_pagamento, totale_imponibile, totale_iva, sconto, totale_generale,
+          aliquota_iva, note_pagamento, totale_imponibile, totale_iva, sconto, marca_bollo,
+          totale_generale, firmato_file, firmato_tipo, firmato_at,
           updated_at, deleted_at, da_sincronizzare)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
        ON CONFLICT(id) DO UPDATE SET
          cliente_id = excluded.cliente_id,
          numero_preventivo = excluded.numero_preventivo,
@@ -650,7 +750,11 @@ async function applicaPreventivo(
          totale_imponibile = excluded.totale_imponibile,
          totale_iva = excluded.totale_iva,
          sconto = excluded.sconto,
+         marca_bollo = excluded.marca_bollo,
          totale_generale = excluded.totale_generale,
+         firmato_file = excluded.firmato_file,
+         firmato_tipo = excluded.firmato_tipo,
+         firmato_at = excluded.firmato_at,
          updated_at = excluded.updated_at,
          deleted_at = excluded.deleted_at,
          da_sincronizzare = 0;`,
@@ -667,7 +771,11 @@ async function applicaPreventivo(
         Number(p.totale_imponibile),
         Number(p.totale_iva),
         Number(p.sconto ?? 0),
+        Number(p.marca_bollo ?? 0),
         Number(p.totale_generale),
+        p.firmato_file ?? null,
+        p.firmato_tipo ?? null,
+        isoLocale(p.firmato_at ?? null),
         isoLocale(p.updated_at),
         isoLocale(p.deleted_at),
       ]
@@ -680,13 +788,14 @@ async function applicaPreventivo(
     for (const v of p.voci ?? []) {
       await db.runAsync(
         `INSERT INTO voci_preventivo
-           (id, preventivo_id, descrizione, quantita, prezzo_unitario, totale_voce)
-         VALUES (?, ?, ?, ?, ?, ?);`,
+           (id, preventivo_id, descrizione, quantita, unita, prezzo_unitario, totale_voce)
+         VALUES (?, ?, ?, ?, ?, ?, ?);`,
         [
           v.id,
           p.id,
           v.descrizione,
           v.quantita,
+          v.unita ?? null,
           v.prezzo_unitario,
           v.totale_voce,
         ]
@@ -694,6 +803,85 @@ async function applicaPreventivo(
     }
   });
   return true;
+}
+
+// --- Voci rapide ---
+
+interface VoceRapidaServer extends Omit<RigaVoceRapida, 'updated_at'> {
+  updated_at: string;
+  server_updated_at: string;
+}
+
+// Come scaricaTabella, ma senza bloccare tutto se sul server la tabella
+// non c'è ancora (vedi inviaVociRapide)
+async function riceviVociRapide(db: SQLiteDatabase): Promise<number> {
+  try {
+    return await scaricaTabella(db, 'voci_rapide', applicaVoceRapida);
+  } catch (err) {
+    if (tabellaMancante(err)) return 0;
+    throw err;
+  }
+}
+
+async function applicaVoceRapida(
+  db: SQLiteDatabase,
+  v: VoceRapidaServer
+): Promise<boolean> {
+  const locale = await db.getFirstAsync<{
+    updated_at: string | null;
+    da_sincronizzare: number;
+  }>('SELECT updated_at, da_sincronizzare FROM voci_rapide WHERE id = ?;', [
+    v.id,
+  ]);
+  if (daSaltare(locale, v.updated_at)) return false;
+
+  await db.runAsync(
+    `INSERT INTO voci_rapide
+       (id, descrizione, prezzo, quantita, unita, posizione, updated_at, deleted_at, da_sincronizzare)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
+     ON CONFLICT(id) DO UPDATE SET
+       descrizione = excluded.descrizione,
+       prezzo = excluded.prezzo,
+       quantita = excluded.quantita,
+       unita = excluded.unita,
+       posizione = excluded.posizione,
+       updated_at = excluded.updated_at,
+       deleted_at = excluded.deleted_at,
+       da_sincronizzare = 0;`,
+    [
+      v.id,
+      v.descrizione,
+      Number(v.prezzo),
+      Number(v.quantita),
+      v.unita,
+      Number(v.posizione),
+      isoLocale(v.updated_at),
+      isoLocale(v.deleted_at),
+    ]
+  );
+  return true;
+}
+
+// Errore di Supabase "colonna che non esiste" (PGRST204): l'app è più
+// nuova del server, manca una migrazione. Le righe restano da inviare e
+// partiranno appena la migrazione è fatta; intanto il resto della
+// sincronizzazione va avanti invece di bloccarsi tutta.
+function colonnaMancante(errore: unknown): boolean {
+  return (errore as { code?: string } | null)?.code === 'PGRST204';
+}
+
+function avvisaMigrazioneMancante(cosa: string, errore: unknown): void {
+  const messaggio = (errore as { message?: string } | null)?.message ?? '';
+  console.warn(
+    `${cosa} non inviati: su Supabase manca una migrazione. ${messaggio}`
+  );
+}
+
+// Errore di Supabase "tabella che non esiste": PGRST205 se la tabella non
+// è nella cache dello schema, 42P01 se è Postgres a non trovarla
+function tabellaMancante(errore: unknown): boolean {
+  const codice = (errore as { code?: string } | null)?.code;
+  return codice === 'PGRST205' || codice === '42P01';
 }
 
 // --- Profilo ---
@@ -707,6 +895,12 @@ interface ProfiloServer {
   email: string | null;
   indirizzo: string | null;
   iban: string | null;
+  // undefined se arriva da prima della migrazione 005
+  firma?: string | null;
+  timbro?: string | null;
+  // undefined se arriva da prima della migrazione 007
+  aliquota_iva?: number | string | null;
+  marca_bollo?: boolean | null;
   updated_at: string;
   server_updated_at: string;
 }
@@ -734,6 +928,11 @@ async function applicaProfilo(
     p.email,
     p.indirizzo,
     p.iban,
+    p.firma ?? null,
+    p.timbro ?? null,
+    // numeric di Postgres arriva come testo: si converte
+    p.aliquota_iva != null ? Number(p.aliquota_iva) : 22,
+    p.marca_bollo ? 1 : 0,
     isoLocale(p.updated_at),
   ];
 
@@ -742,6 +941,7 @@ async function applicaProfilo(
       `UPDATE profilo_fabbro SET
          nome_azienda = ?, titolare = ?, p_iva = ?, codice_fiscale = ?,
          telefono = ?, email = ?, indirizzo = ?, iban = ?,
+         firma = ?, timbro = ?, aliquota_iva = ?, marca_bollo = ?,
          updated_at = ?, da_sincronizzare = 0
        WHERE id = ?;`,
       [...valori, locale.id]
@@ -750,8 +950,8 @@ async function applicaProfilo(
     await db.runAsync(
       `INSERT INTO profilo_fabbro
          (nome_azienda, titolare, p_iva, codice_fiscale, telefono, email, indirizzo, iban,
-          updated_at, da_sincronizzare)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0);`,
+          firma, timbro, aliquota_iva, marca_bollo, updated_at, da_sincronizzare)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0);`,
       valori
     );
   }
@@ -829,7 +1029,8 @@ async function applicaBiglietto(
 // (IS invece di = perché funziona anche se updated_at è NULL.)
 async function segnaInviate(
   db: SQLiteDatabase,
-  tabella: 'clienti' | 'preventivi' | 'profilo_fabbro' | 'biglietto',
+  tabella:
+    'clienti' | 'preventivi' | 'profilo_fabbro' | 'biglietto' | 'voci_rapide',
   righe: { id: string | number; updated_at: string | null }[]
 ): Promise<void> {
   await db.withTransactionAsync(async () => {

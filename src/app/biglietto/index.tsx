@@ -20,8 +20,8 @@ import { AnteprimaBiglietto } from '../../components/biglietto/AnteprimaBigliett
 import { FormInput } from '../../components/ui/FormInput';
 import { FONT, useSceltaTema, useTema, type Tema } from '../../constants/tema';
 import {
-  CONDIVISIONE_IN_CORSO,
   condividiPdfBiglietto,
+  CONDIVISIONE_IN_CORSO,
 } from '../../services/bigliettoPdf';
 import {
   campiMancanti,
@@ -31,8 +31,8 @@ import {
 } from '../../services/bigliettoService';
 import { getProfiloFabbro } from '../../services/databaseService';
 import { condividiContatto } from '../../services/vcardService';
-import { avviso } from '../../utils/dialoghi';
 import { styles } from '../../styles/biglietto.styles';
+import { avviso } from '../../utils/dialoghi';
 
 // Oltre questa dimensione (circa 2 MB) il logo appesantisce database e PDF
 const MAX_LOGO_BASE64 = 2_800_000;
@@ -366,7 +366,7 @@ export default function BigliettoScreen() {
         <Sezione t={t} titolo="Fronte">
           <FormInput
             label="Descrizione attività"
-            placeholder="es. Installazioni e riparazioni"
+            placeholder="es. Info della tua attività"
             value={dati.descrizione_fronte ?? ''}
             onChangeText={aggiorna('descrizione_fronte')}
             onFocus={() => setLato('fronte')}
@@ -388,7 +388,7 @@ export default function BigliettoScreen() {
           </Text>
           <FormInput
             label="Nome attività *"
-            placeholder="es. Officina Rossi"
+            placeholder="es. Attività Rossi"
             value={dati.nome ?? ''}
             onChangeText={aggiorna('nome')}
             onFocus={() => setLato('retro')}
@@ -402,7 +402,7 @@ export default function BigliettoScreen() {
           />
           <FormInput
             label="Descrizione retro"
-            placeholder="es. Lavori su misura"
+            placeholder="Specificare ruolo attività"
             value={dati.descrizione_retro ?? ''}
             onChangeText={aggiorna('descrizione_retro')}
             onFocus={() => setLato('retro')}
@@ -564,7 +564,7 @@ function mostraErroreCondivisione(err: unknown, messaggio: string) {
   }
 }
 
-// Completa i campi vuoti del biglietto con i dati del profilo dell'officina
+// Completa i campi vuoti del biglietto con i dati del profilo dell'attività
 async function datiDalProfilo(attuali: Biglietto): Promise<Biglietto> {
   const p = await getProfiloFabbro();
   if (!p) return attuali;

@@ -20,8 +20,16 @@ import { prendiClienteCreato } from '../../utils/clienteAppenaCreato';
 import { avviso } from '../../utils/dialoghi';
 import { useTema, type Tema } from '../../constants/tema';
 import {
+  ALIQUOTA_IVA_PREDEFINITA,
+  etichettaTotaleConIva,
+  etichettaTotaleFinale,
+  IMPORTO_MARCA_BOLLO,
+} from '../../constants/fisco';
+import { quantitaConUnita } from '../../constants/unita';
+import {
   getClienteById,
   getPreventivoById,
+  getImpostazioniPreventivi,
   getVociByPreventivoId,
   savePreventivoWithVoci,
   type Cliente,
@@ -35,8 +43,6 @@ import {
   percentualeSconto,
 } from '../../utils/formato';
 import { styles } from '../../styles/preventivi/nuovo.styles';
-
-const ALIQUOTA_IVA = 22;
 
 interface VoceInLista extends NuovaVoce {
   chiave: string; // solo per la lista a schermo, non viene salvata
@@ -59,7 +65,10 @@ export default function NuovoPreventivoScreen() {
   const [dataEmissione, setDataEmissione] = useState<string>(
     new Date().toISOString()
   );
-  const [aliquotaIva, setAliquotaIva] = useState(ALIQUOTA_IVA);
+  // Aliquota e marca da bollo: per un preventivo nuovo vengono dalle
+  // impostazioni del Profilo; uno esistente tiene le sue
+  const [aliquotaIva, setAliquotaIva] = useState(ALIQUOTA_IVA_PREDEFINITA);
+  const [marcaBollo, setMarcaBollo] = useState(0);
   const [note, setNote] = useState(''); // non modificabili qui, ma da conservare
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [oggetto, setOggetto] = useState('');
@@ -73,6 +82,17 @@ export default function NuovoPreventivoScreen() {
   const [voceInModifica, setVoceInModifica] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [caricamento, setCaricamento] = useState(inModifica);
+
+  // Nuovo preventivo: aliquota e marca da bollo dalle impostazioni
+  useEffect(() => {
+    if (idPreventivo) return;
+    getImpostazioniPreventivi()
+      .then((imp) => {
+        setAliquotaIva(imp.aliquota_iva);
+        setMarcaBollo(imp.marca_bollo ? IMPORTO_MARCA_BOLLO : 0);
+      })
+      .catch((err) => console.error('Impostazioni non lette:', err));
+  }, [idPreventivo]);
 
   // Modifica: carica il preventivo esistente con le sue voci e il cliente
   useEffect(() => {
@@ -95,11 +115,13 @@ export default function NuovoPreventivoScreen() {
         setNote(p.note_pagamento ?? '');
         setOggetto(p.oggetto ?? '');
         setSconto(p.sconto ?? 0);
+        setMarcaBollo(p.marca_bollo ?? 0);
         setVoci(
           vociSalvate.map((v) => ({
             chiave: v.id,
             descrizione: v.descrizione,
             quantita: v.quantita,
+            unita: v.unita ?? null,
             prezzo_unitario: v.prezzo_unitario,
           }))
         );
@@ -138,7 +160,8 @@ export default function NuovoPreventivoScreen() {
   );
   const iva = (imponibile * aliquotaIva) / 100;
   const totaleConIva = imponibile + iva;
-  const totale = totaleConIva - sconto;
+  // Il bollo si aggiunge dopo l'arrotondamento: è una spesa a parte
+  const totale = totaleConIva - sconto + marcaBollo;
 
   // Se cambiano le voci, il vecchio arrotondamento non ha più senso
   // (240 era giusto per 244, non per il nuovo totale): si toglie e,
@@ -163,6 +186,14 @@ export default function NuovoPreventivoScreen() {
       ]);
     }
     chiudiFoglio();
+  };
+
+  // Dal foglio "Aggiungi una voce" alla gestione delle voci rapide.
+  // Si apre nella stessa scheda, sopra questa pagina: il preventivo in
+  // corso resta qui sotto, intatto, e si ritrova tornando indietro.
+  const gestisciVociRapide = () => {
+    chiudiFoglio();
+    router.push('/preventivi/voci-rapide');
   };
 
   const apriNuovaVoce = () => {
@@ -202,9 +233,11 @@ export default function NuovoPreventivoScreen() {
       aliquota_iva: aliquotaIva,
       note_pagamento: note,
       sconto,
-      voci: voci.map(({ descrizione, quantita, prezzo_unitario }) => ({
+      marca_bollo: marcaBollo,
+      voci: voci.map(({ descrizione, quantita, unita, prezzo_unitario }) => ({
         descrizione,
         quantita,
+        unita,
         prezzo_unitario,
       })),
     };
@@ -407,7 +440,7 @@ export default function NuovoPreventivoScreen() {
                     <Text
                       style={[styles.voceMeta, { color: t.testoSecondario }]}
                     >
-                      {v.quantita.toLocaleString('it-IT')} ×{' '}
+                      {quantitaConUnita(v.quantita, v.unita)} ×{' '}
                       {formattaEuro(v.prezzo_unitario)}
                     </Text>
                   </View>
@@ -457,17 +490,20 @@ export default function NuovoPreventivoScreen() {
                 t={t}
               />
               <RigaTotale
-                etichetta={`IVA ${aliquotaIva}%`}
-                valore={formattaEuro(iva)}
+                etichetta={aliquotaIva > 0 ? `IVA ${aliquotaIva}%` : 'IVA'}
+                valore={aliquotaIva > 0 ? formattaEuro(iva) : 'non soggetta'}
                 t={t}
               />
               {sconto > 0 && (
                 <>
-                  <RigaTotale
-                    etichetta="Totale con IVA"
-                    valore={formattaEuro(totaleConIva)}
-                    t={t}
-                  />
+                  {/* Senza IVA sarebbe uguale all'imponibile: si salta */}
+                  {aliquotaIva > 0 && (
+                    <RigaTotale
+                      etichetta={etichettaTotaleConIva(aliquotaIva)}
+                      valore={formattaEuro(totaleConIva)}
+                      t={t}
+                    />
+                  )}
                   <RigaTotale
                     etichetta={`Sconto arrotondamento (${formattaPercentuale(
                       percentualeSconto(sconto, totaleConIva)
@@ -476,6 +512,13 @@ export default function NuovoPreventivoScreen() {
                     t={t}
                   />
                 </>
+              )}
+              {marcaBollo > 0 && (
+                <RigaTotale
+                  etichetta="Marca da bollo"
+                  valore={formattaEuro(marcaBollo)}
+                  t={t}
+                />
               )}
             </View>
           )}
@@ -495,7 +538,7 @@ export default function NuovoPreventivoScreen() {
       >
         <View style={styles.totaleBox}>
           <Text style={[styles.totaleEtichetta, { color: t.testoSecondario }]}>
-            {sconto > 0 ? 'Totale arrotondato' : 'Totale con IVA'}
+            {etichettaTotaleFinale(aliquotaIva, sconto, marcaBollo)}
           </Text>
           <Text
             style={[styles.totaleValore, { color: t.testo }]}
@@ -557,6 +600,7 @@ export default function NuovoPreventivoScreen() {
       <FoglioArrotonda
         visibile={arrotondaAperto}
         totaleConIva={totaleConIva}
+        etichettaTotale={etichettaTotaleConIva(aliquotaIva)}
         scontoAttuale={sconto}
         onChiudi={() => setArrotondaAperto(false)}
         onApplica={(nuovoSconto) => {
@@ -568,6 +612,7 @@ export default function NuovoPreventivoScreen() {
         visibile={foglioAperto}
         onChiudi={chiudiFoglio}
         onAggiungi={confermaVoce}
+        onGestisciVociRapide={gestisciVociRapide}
         voceDaModificare={voceDaModificare}
       />
     </View>

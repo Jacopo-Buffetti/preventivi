@@ -138,6 +138,72 @@ async function apriEInizializza(): Promise<SQLite.SQLiteDatabase> {
     'REAL NOT NULL DEFAULT 0'
   );
 
+  // Migrazione: firma e timbro del professionista, come data URI
+  // (data:image/png;base64,...), come il logo del biglietto
+  await aggiungiColonnaSeManca(db, 'profilo_fabbro', 'firma', 'TEXT');
+  await aggiungiColonnaSeManca(db, 'profilo_fabbro', 'timbro', 'TEXT');
+
+  // Migrazione: copia firmata dal cliente (vedi firmatiService.ts).
+  // Anche queste DOPO rendiNumeroFacoltativo, per lo stesso motivo.
+  await aggiungiColonnaSeManca(db, 'preventivi', 'firmato_file', 'TEXT');
+  await aggiungiColonnaSeManca(db, 'preventivi', 'firmato_tipo', 'TEXT');
+  await aggiungiColonnaSeManca(db, 'preventivi', 'firmato_at', 'TEXT');
+  // Solo locale: 1 = il file va ancora caricato (o tolto) sul server
+  await aggiungiColonnaSeManca(
+    db,
+    'preventivi',
+    'firmato_da_caricare',
+    'INTEGER NOT NULL DEFAULT 0'
+  );
+
+  // Migrazione: impostazioni dei preventivi nel profilo (constants/fisco.ts)
+  // - aliquota_iva: proposta ai preventivi nuovi (22 finché non si cambia)
+  // - marca_bollo: 1 = aggiungi la marca da bollo ai preventivi nuovi
+  await aggiungiColonnaSeManca(
+    db,
+    'profilo_fabbro',
+    'aliquota_iva',
+    'REAL NOT NULL DEFAULT 22'
+  );
+  await aggiungiColonnaSeManca(
+    db,
+    'profilo_fabbro',
+    'marca_bollo',
+    'INTEGER NOT NULL DEFAULT 0'
+  );
+  // E sul preventivo: l'importo del bollo (0 = senza), già compreso in
+  // totale_generale. Salvato sul preventivo perché cambiare l'impostazione
+  // nel profilo non deve cambiare i preventivi già fatti.
+  await aggiungiColonnaSeManca(
+    db,
+    'preventivi',
+    'marca_bollo',
+    'REAL NOT NULL DEFAULT 0'
+  );
+
+  // Migrazione: unità di misura delle voci (vedi constants/unita.ts).
+  // NULL = nessuna unità, come tutte le voci create prima.
+  await aggiungiColonnaSeManca(db, 'voci_preventivo', 'unita', 'TEXT');
+
+  // 7. Voci rapide: le voci che l'utente usa più spesso, pronte da
+  // aggiungere a un preventivo. Le decide lui dal Profilo; si parte vuoti.
+  // - prezzo e quantita: proposti quando si sceglie la voce
+  // - posizione: l'ordine scelto dall'utente (0 = la prima)
+  // Si sincronizzano come i clienti, con cancellazione "soft".
+  await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS voci_rapide (
+      id TEXT PRIMARY KEY NOT NULL,
+      descrizione TEXT NOT NULL,
+      prezzo REAL NOT NULL DEFAULT 0,
+      quantita REAL NOT NULL DEFAULT 1,
+      unita TEXT,
+      posizione INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT,
+      deleted_at TEXT,
+      da_sincronizzare INTEGER NOT NULL DEFAULT 1
+    );
+  `);
+
   // 6. Stato della sincronizzazione: piccola tabella "chiave → valore".
   // Contiene, per esempio:
   //   utente        → id dell'utente a cui appartengono i dati di questo dispositivo

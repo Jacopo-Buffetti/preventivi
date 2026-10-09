@@ -1,7 +1,11 @@
 import { adesso, getDbConnection } from './db';
 import { segnalaModificaLocale } from './eventiSync';
 import { nuovoId } from './id';
-import { scontoValido, type PreventivoInput } from './databaseService';
+import {
+  bolloValido,
+  scontoValido,
+  type PreventivoInput,
+} from './databaseService';
 
 // Aggiorna un preventivo esistente con le sue voci.
 // Restano invariati numero, anno, data di emissione e stato: cambiano cliente,
@@ -23,14 +27,16 @@ export async function updatePreventivoWithVoci(
   });
   const totaleIva = (imponibile * aliquotaIva) / 100;
   const sconto = scontoValido(input.sconto, imponibile + totaleIva);
-  const totaleGenerale = imponibile + totaleIva - sconto;
+  const bollo = bolloValido(input.marca_bollo);
+  const totaleGenerale = imponibile + totaleIva - sconto + bollo;
 
   // Tutto in una transazione: o si salva tutto, o non cambia niente
   await db.withTransactionAsync(async () => {
     await db.runAsync(
       `UPDATE preventivi
        SET cliente_id = ?, oggetto = ?, aliquota_iva = ?, note_pagamento = ?,
-           totale_imponibile = ?, totale_iva = ?, sconto = ?, totale_generale = ?,
+           totale_imponibile = ?, totale_iva = ?, sconto = ?, marca_bollo = ?,
+           totale_generale = ?,
            updated_at = ?, da_sincronizzare = 1
        WHERE id = ?;`,
       [
@@ -41,6 +47,7 @@ export async function updatePreventivoWithVoci(
         imponibile,
         totaleIva,
         sconto,
+        bollo,
         totaleGenerale,
         adesso(),
         idPreventivo,
@@ -54,13 +61,14 @@ export async function updatePreventivoWithVoci(
     for (const voce of vociCalcolate) {
       const voceId = nuovoId();
       await db.runAsync(
-        `INSERT INTO voci_preventivo (id, preventivo_id, descrizione, quantita, prezzo_unitario, totale_voce)
-         VALUES (?, ?, ?, ?, ?, ?);`,
+        `INSERT INTO voci_preventivo (id, preventivo_id, descrizione, quantita, unita, prezzo_unitario, totale_voce)
+         VALUES (?, ?, ?, ?, ?, ?, ?);`,
         [
           voceId,
           idPreventivo,
           voce.descrizione,
           voce.quantita,
+          voce.unita ?? null,
           voce.prezzo_unitario,
           voce.totaleVoce,
         ]
